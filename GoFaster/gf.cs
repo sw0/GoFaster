@@ -11,14 +11,15 @@ using System.Windows.Forms;
 using System.Xml;
 using System.Xml.Serialization;
 
-namespace Slin.P4Cmd
+namespace Slin.GoFaster
 {
     class Program
     {
         /**
          * 0.2.0.0  initial version; TODO process `CmdEntry`
+         * 0.3.0.0  rename P4Cmd to GoFaster and use gf as assembly name
          * */
-        const string AppVersion = "0.2.0.0";
+        const string AppVersion = "0.3.0.0";
         private static string CmdRegularExpressionString;
         static readonly Regex RegBranch = new Regex(@"\\(current|offcycle|integration|production|trunk|release)\\");
         static readonly Regex RegArgs = new Regex(@"/?\b(?<optkey>[a-zA-Z]+)[\:|=](?<optval>[^""\s]+|""(?:[^""]+""))|-(?<optval>[a-zA-Z]+)\s+(?<optval>[^""\s]+|""(?:[^""]+)"")|--(?<optflag>[a-zA-Z]+)");
@@ -376,14 +377,14 @@ namespace Slin.P4Cmd
         private static void SetBranch(List<Project> projects, string branchNumber)
         {
             var title = Console.Title;
-            var idx = title.IndexOf(" - P4Cmd", StringComparison.OrdinalIgnoreCase);
+            var idx = title.IndexOf(" - GoFaster", StringComparison.OrdinalIgnoreCase);
             if (idx >= 0)
             {
-                Console.Title = $"{title.Substring(0, idx)} - P4Cmd on branch {branchNumber} (V{AppVersion})";
+                Console.Title = $"{title.Substring(0, idx)} - GoFaster on branch {branchNumber} (V{AppVersion})";
             }
             else
             {
-                Console.Title = $"{title} - P4Cmd on branch {branchNumber} (V{AppVersion})";
+                Console.Title = $"{title} - GoFaster on branch {branchNumber} (V{AppVersion})";
             }
 
             for (int i = 0; i < projects.Count; i++)
