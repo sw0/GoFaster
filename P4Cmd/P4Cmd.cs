@@ -1,0 +1,1422 @@
+using System;
+using System.Collections.Generic;
+using System.Configuration;
+using System.Diagnostics;
+using System.IO;
+using System.Linq;
+using System.Reflection;
+using System.Text;
+using System.Text.RegularExpressions;
+using System.Windows.Forms;
+using System.Xml;
+using System.Xml.Serialization;
+
+namespace Slin.P4Cmd
+{
+    class Program
+    {
+        /**
+         * 0.2.0.0  initial version; TODO process `CmdEntry`
+         * */
+        const string AppVersion = "0.2.0.0";
+        private static string CmdRegularExpressionString;
+        static readonly Regex RegBranch = new Regex(@"\\(current|offcycle|integration|production|trunk|release)\\");
+        static readonly Regex RegArgs = new Regex(@"/?\b(?<optkey>[a-zA-Z]+)[\:|=](?<optval>[^""\s]+|""(?:[^""]+""))|-(?<optval>[a-zA-Z]+)\s+(?<optval>[^""\s]+|""(?:[^""]+)"")|--(?<optflag>[a-zA-Z]+)");
+        static string _p4Workspace = @"c:\p4";  // my personal default perforce workspace
+        static string _wcfTestClientLocation = @"C:\Program Files (x86)\Microsoft Visual Studio 14.0\Common7\IDE\WcfTestClient.exe";
+
+        static readonly Regex _regAction = null;
+        static readonly Regex _regP4Workspace = new Regex(@"^c:\\P4", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+        static readonly Regex _regP4Config = new Regex(@"REM\s+--START\s*P4(.+)REM --END P4 CONFIG--", RegexOptions.Compiled | RegexOptions.Singleline);
+
+        static string _workingBranch = "current";
+        static string _defaultTeams = string.Empty; //or "all"
+        static List<Project> AllProjects = new List<Project>();
+        static List<Project> CurrentProjects = new List<Project>();
+
+        static readonly string AllCommandNames = ",list,ls,cmd,mmc,ping,eventviewer,notepad,notepad++,desc,describe,wiki,p4v,inetmgr,ssms,sql,postman,pm,iisreset,help,?,set,db,hosts,folder,fld,code,wcf,";
+        const string FolderHost = @"C:\Windows\System32\drivers\etc\";
+        internal static readonly Dictionary<string, string> KeyMapping = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        internal static readonly Dictionary<string, string> ValueMapping = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        internal static readonly Dictionary<string, string> HostsRepositories = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        internal static readonly Dictionary<string, string> CmdSamples = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+        static bool _isFirstRun = false;
+        static bool _enableLog = false;
+        private static string CurrentCommand = "";
+        const int ColumnSize = 36;  // Console.WindowSize / _columnSize to get the column count
+        const string ProfileFileName = ".\\p4cmd_profile.xml";
+        private const int Indent = 2;
+
+        static Program()
+        {
+            CmdRegularExpressionString = $@"^\s*(?<command>sync|open|bld|build|start|folder|fld|code|url|wiki|desc|describe)(?:\s+(?<projNoOrName>[\._\w]+))?"
+            + $@"|^\s*(?<command>(?:list|ls|set))\s*"  //e.g. list /team:team8 /name:coreapi /category:ecash
+            + $@"|^\s*(?<command>notepad|notepad\+\+|p4v|inetmgr|ssms|sql|iisreset|vs\d{4}|wcf|postman|pm)\s*"
+            + @"|^\s*(?<command>help|\?)\s*$"
+            + @"|^\s*(?<command>cmd|mmc|eventviewer)\s*$"
+            + @"|^\s*(?<command>ping)\s+(?<action>.+)\s*$"  //action actually is IP or host name here
+            + $@"|^\s*(?<command>hosts)(?:\s+(?<action>open|set|find|restore|fld|folder))?\s*"  //host, env, for:
+            + @"|^\s*(?<command>db)(?:\s+(?<dbName>[-\w]+))?";  //set branch=int;
+
+            _regAction = new Regex(CmdRegularExpressionString,
+                RegexOptions.Compiled | RegexOptions.IgnoreCase);
+
+            const string tmp = "<projectNameOrNo> b[ranch]:int[egration]|off[cycle]|current|Trunk|Release --force";
+            CmdSamples = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                {"misc", "notepad[++], wcf, sql, ssms, inetmgr, p4v, postman|pm, mmc, db"},
+                {"SYNC", $"sync {tmp} f[orce]:1 --f"},
+                {"OPEN", $"open|code {tmp}"},
+                {"CODE", $"open|code {tmp}"},
+                {"desc", $"desc {tmp}"},
+                {"HOSTS", "hosts; hosts open|folder|fld|restore;hosts set e[nv]|b[branch]:QA4 [for:repo2];hosts set for:repo1,repo2,move e:dev merge:di;hosts restore; hosts find h[ost]:server1v3|IP e:qa for=repo1"},
+                {"ls,list", "ls|list team:team8,alpha name:coreapi category:ecash"},
+                {"wiki", "wiki; wiki 31; wiki PinService; wiki pinser"},
+                {"url", "wiki; wiki 31; wiki PinService; wiki pinser"},
+                {"fld,folder", "fld|folder [projectNameOrNo]"},
+                {"bld,bld", $"bld|build {tmp}"},
+                {"cls,clear,q", $"clear|cls console"},
+            };
+
+            InitParametersMappings();
+        }
+
+        [STAThread]
+        static void Main(string[] args)
+        {
+            if (args.Length > 0 &&
+                (args[0].ToLower() == "help" || args[0].ToLower() == "/help" || args[0].ToLower() == "--help"
+                || args[0].ToLower() == "?" || args[0].ToLower() == "/?"))
+            {
+                Help();
+                Console.ReadKey();
+            }
+            var options = ResolveOptions(null, null, args);
+            if (options.ContainsKey("enablelog") || options.ContainsKey("dbg") || options.ContainsKey("debug")) _enableLog = true;
+
+            if (_enableLog) Console.WriteLine(CmdRegularExpressionString);
+
+            InitConfigurations();
+
+
+            Console.WriteLine("Please run this as administrator(some projects needs it to setup IIS website/application. CTRL+Shift+Enter)");
+            //Console.WriteLine("Files you probably need to maintain are: projects.xml and sync.cmd.");
+            if (_enableLog) Console.WriteLine($"DEBUG: {ConfigurationManager.AppSettings["P4Client"]}");
+
+            if (_isFirstRun || options.ContainsKey("init"))
+            {
+                SetupSampleProfile(options);
+
+                if (_isFirstRun)
+                {
+                    Help(); WriteLineIdt("Press any key to list all the projects.");
+                    Console.ReadKey();
+                }
+            }
+
+            var profile = GetP4CmdProfile();
+            var allProjects = profile.Projects;
+            AllProjects = allProjects.Where(p => p.Enabled).ToList();
+            CurrentProjects = AllProjects.OrderBy(p => p.Name).ToList();
+
+            if (allProjects.Count == 0 || AllProjects.Count == 0)
+            {
+                WriteLineIdt("invalid projects.xml file or no projects in it.");
+            }
+            Console.WriteLine($"Got {CurrentProjects.Count} projects loaded from projects.xml; p4 sync cmd got maintained in sync.cmd.");
+
+            if (_enableLog) foreach (var kvp in options) Console.WriteLine($"OPTION: {kvp.Key} : {kvp.Value}");
+            _workingBranch = options.ContainsKey("branch") ? options["branch"] : "current";
+            Console.WriteLine($"\r\nFollowing are the projects for working branch '{_workingBranch}':");
+
+            SetBranch(AllProjects, _workingBranch);
+
+            {
+                var owners = options.ContainsKey("team") ? options["team"] : _defaultTeams;
+                var category = options.ContainsKey("category") ? options["category"] : null;
+                var name = options.ContainsKey("name") ? options["name"] : null;
+                ListProjects(owners.Split(new[] { ',', ' ' }, StringSplitOptions.RemoveEmptyEntries), category, name);
+            }
+
+            Console.WriteLine();
+        STEP01:
+            var old = Console.ForegroundColor;
+            Console.ForegroundColor = ConsoleColor.DarkYellow;
+            Console.WriteLine("> 'sync|open|build|bld|desc|folder|fld|code|url <projNoOrName> [b:<branch>]';");
+            WriteLineIdt($"'hosts open/set [e[nv]:local|di|dev-int|qa4|qa3[-nonasm]|QA|STG] [for:default|repo1|repo2|move]'");
+            WriteLineIdt($"'wiki|notepad(++)|p4v|inetmgr|ssms|sql|mmc|cmd|postman|pm|iisreset|list|ls|wcf' for help, run p4v, list projects");
+            WriteLineIdt($"'?' or '<cmd> ?' for help. 'exit|quit|q|cls|clear' to quit/clear.");
+            Console.ForegroundColor = old;
+
+        STEP02:
+            if (Console.CursorLeft > 0) Console.WriteLine();
+            Console.Write("> ");
+            //todo autocomplete
+
+            var inputCmd = Console.ReadLine() ?? string.Empty;
+
+            if (",q,exit,quit,".IndexOf("," + inputCmd.ToLower() + ",", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                Console.Clear();
+                //do nothing and exit
+            }
+            else if (inputCmd.ToLower() == "cls" || "clear" == inputCmd.ToLower())
+            {
+                Console.Clear();
+                goto STEP01;
+            }
+            else
+            {
+                var matchAction = _regAction.Match(inputCmd);
+                if (matchAction.Success)
+                {
+                    CurrentCommand = inputCmd;
+
+                    var command = matchAction.Groups["command"].Value;
+                    var action = matchAction.Groups["action"].Value;
+                    var projNoOrName = matchAction.Groups["projNoOrName"].Value;
+
+                    if (string.IsNullOrEmpty(command) && !string.IsNullOrEmpty(projNoOrName))
+                        command = "open";
+
+                    var matchedCmd = matchAction.ToString();
+                    var optionsString = inputCmd.Substring(matchedCmd.Length);
+                    var parameters = ResolveOptions(command, action, optionsString.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries));
+
+                    if (_enableLog)
+                        Console.WriteLine($"STEP02:: command: {command}, action: {action}, projNoOrName: {projNoOrName}, default teams: {_defaultTeams} \r\nparameters: {string.Join(", ", parameters.Select(o => $"{o.Key}:{o.Value}").ToList())}");
+
+                    GoAction(command, action, projNoOrName, AllProjects, parameters);
+
+                    if (",cls,clear,".IndexOf("," + command + ",", StringComparison.OrdinalIgnoreCase) >= 0)
+                    {
+                        goto STEP01;
+                    }
+
+                    goto STEP02;
+                }
+
+                if (!string.IsNullOrWhiteSpace(inputCmd))
+                {
+                    var arr = inputCmd.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+                    var firstSegment = arr[0];
+                    var secondSeg = (arr.Length > 1) ? arr[1].ToLower() : "";
+                    if (CmdSamples.ContainsKey(firstSegment))
+                    {
+                        if (secondSeg != "help" && secondSeg != "?" && arr.Length > 1) WriteLineIdt("Invalid input, examples: ");
+                        old = Console.ForegroundColor;
+                        Console.ForegroundColor = ConsoleColor.DarkYellow;
+                        CmdSamples[firstSegment].Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries)
+                            .ToList().ForEach(eg => WriteLineIdt("* " + eg.Trim()));
+                        Console.ForegroundColor = old;
+                        goto STEP02;
+                    }
+
+                    var parameters = ResolveOptions("open", null, inputCmd.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries));
+                    GoAction("open", null, inputCmd.Trim(), CurrentProjects, parameters);
+                    goto STEP02;
+                }
+
+                WriteLineIdt("invalid input, try again");
+                goto STEP02;
+            }
+        }
+
+        private static void InitConfigurations()
+        {
+            _p4Workspace = ConfigurationManager.AppSettings["P4Workspace"]?.TrimEnd('\\').Replace('/', '\\');
+            _wcfTestClientLocation = ConfigurationManager.AppSettings["WcfTestClientLocation"]?.ToString();
+
+            if (Assembly.GetExecutingAssembly() != null)
+            {
+                Environment.CurrentDirectory = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+            }
+
+            #region --sync_init.cmd--
+            var nl = Environment.NewLine;
+            var initSyncInitContent = $"@echo off{nl}{nl}REM --START P4 CONFIG--{nl}"
+                + $"#PARAMETERS WILL BE SET BASE ON CONFIGURATION HERE{nl}"
+                + $"REM --END P4 CONFIG--{nl}echo P4Port:   %P4Port%{nl}echo P4USER:   %P4USER%{nl}echo P4Client: %P4Client%{nl}";
+
+            var p4Port = ConfigurationManager.AppSettings["P4Port"];
+            var p4Client = ConfigurationManager.AppSettings["P4Client"];
+            var p4User = ConfigurationManager.AppSettings["P4User"];
+            _defaultTeams = ConfigurationManager.AppSettings["DefaultTeams"];
+            //_enableLog maybe set by command argument already
+            if (!_enableLog) bool.TryParse(ConfigurationManager.AppSettings["EnableLog"], out _enableLog);
+
+            //update sync_init.cmd base on user's environment
+            var realConfig = $@"REM --START P4 CONFIG--{nl}set P4Port={p4Port}{nl}set P4Client={p4Client}{nl}SET P4USER={p4User}{nl}SET P4WorkspaceMappedPath={_p4Workspace}{nl}REM --END P4 CONFIG--";
+            var fileSyncInit = "sync_init.cmd";
+
+            if (File.Exists(fileSyncInit))
+            {
+                var syncInitAttrs = File.GetAttributes(fileSyncInit);
+                if ((syncInitAttrs & FileAttributes.ReadOnly) != 0)
+                {
+                    File.SetAttributes(fileSyncInit, syncInitAttrs ^ FileAttributes.ReadOnly);
+                }
+                File.WriteAllText(fileSyncInit, _regP4Config.Replace(File.ReadAllText(fileSyncInit), realConfig));
+            }
+            else
+            {
+                var content = _regP4Config.Replace(initSyncInitContent, realConfig);
+                File.WriteAllText(fileSyncInit, content);
+                _isFirstRun = true;
+            }
+            //END sync_init.cmd
+
+            #endregion
+
+            #region -- hosts repositories --
+            //configuration hosts
+            var tmp = ConfigurationManager.AppSettings["HostsRepositories"];
+            if (!string.IsNullOrWhiteSpace(tmp))
+            {
+                var entries = tmp.Split(new[] { ';', ' ', '\r', '\n', '\t' }, StringSplitOptions.RemoveEmptyEntries).ToList();
+
+                HostsRepositories.Add("default(local)", $@"{FolderHost}hosts");
+                //hosts-mine: your customized hosts file
+                HostsRepositories.Add("default(mine)", $@"{FolderHost}hosts-mine");
+
+                entries.ForEach(entry =>
+                {
+                    var row = entry.Split(new[] { ':', ' ' }, StringSplitOptions.RemoveEmptyEntries);
+
+                    if (row.Length >= 3)
+                    {
+                        var name = row[0];
+                        var dirSuffix = row[1];
+                        var environments = row[2].Split(new[] { ',', ' ', '|' }, StringSplitOptions.RemoveEmptyEntries);
+                        //Console.WriteLine($".. {dirSuffix}");
+                        const char slash = '\\';
+                        foreach (var env in environments)
+                        {
+                            var dir = _p4Workspace.TrimEnd(slash) + slash + dirSuffix.Trim(slash) + slash + env + "\\hosts";
+                            if (name == "default")
+                            {
+                                HostsRepositories.Add($"{name}({env})".ToLower(), dir + "-ASM");
+                                HostsRepositories.Add($"{name}({env}-nonasm)".ToLower(), dir + "-NonASM");
+                            }
+                            else
+                            {
+                                HostsRepositories.Add($"{name}({env})".ToLower(), dir);
+                            }
+                        }
+
+                        if (_enableLog)
+                        {
+                            foreach (var kvp in HostsRepositories)
+                            {
+                                WriteLineIdt($"HostsRepositories > {kvp.Key} : {kvp.Value}");
+                            }
+                        }
+                    }
+                });
+            }
+
+            #endregion
+        }
+
+        private static void ListProjects(string[] owners = null, string category = null, string name = null)
+        {
+            owners = owners ?? new string[0];
+            CurrentProjects = AllProjects.Where(p => owners.Length == 0
+               || owners.Contains("all", StringComparer.OrdinalIgnoreCase)
+                //|| "all".Equals(owner, StringComparison.OrdinalIgnoreCase)
+                || owners.Any(owner => (owner.StartsWith("\"")) && owner.Equals(p.Owner.Trim(new[] { '"' }), StringComparison.OrdinalIgnoreCase))
+                || owners.Any(owner => p.Owner.IndexOf(owner, StringComparison.OrdinalIgnoreCase) >= 0)).ToList();
+
+            var splitter = new[] { ' ', ',' };
+            CurrentProjects = CurrentProjects.Where(p => string.IsNullOrEmpty(category)
+                || (!category.StartsWith("\"")) && p.Category.Split(splitter, StringSplitOptions.RemoveEmptyEntries).Any(c => category.Equals(c, StringComparison.OrdinalIgnoreCase))
+                || p.Category.Split(splitter, StringSplitOptions.RemoveEmptyEntries).Any(c => c.IndexOf(category, StringComparison.OrdinalIgnoreCase) >= 0)).ToList();
+
+            var list = CurrentProjects;
+            if (!string.IsNullOrWhiteSpace(name))
+                list = list.Where(p => p.Name.IndexOf(name, StringComparison.OrdinalIgnoreCase) >= 0).ToList();
+
+            if (_enableLog)
+                Console.WriteLine($"AllProjects: {AllProjects.Count}, CurrentProjects: {CurrentProjects.Count}, list:  {list.Count}, owner: {String.Join(",", owners)}, category: {category}, name: {name}");
+
+            var groups = list.GroupBy(item => item.Owner);
+
+            foreach (var g in groups.OrderBy(g => g.Key))
+            {
+                var old = Console.ForegroundColor;
+                Console.ForegroundColor = ConsoleColor.Green;
+                if (Console.CursorLeft > 0 && Console.CursorLeft != Console.WindowWidth) Console.WriteLine();
+                Console.WriteLine($"[TEAM/OWNER: {g.Key}]");//  {Console.WindowWidth} {Console.CursorLeft}");
+                Console.ForegroundColor = old;
+                foreach (var item in g)
+                {
+                    //var printName = $"{item.Index, 3:d} {item.Name}".PadRight(_columnSize).Substring(0, _columnSize);
+                    var printName = $"{item.Index:d3} {item.Name}".PadRight(ColumnSize).Substring(0, ColumnSize);
+                    Console.Write(printName);
+
+                    if (Console.WindowWidth - Console.CursorLeft < ColumnSize)
+                        Console.WriteLine();
+                }
+            }
+            Console.WriteLine();
+        }
+
+        #region Console Help Methods
+        public static void ClearCurrentConsoleLine()
+        {
+            int currentLineCursor = Console.CursorTop;
+            Console.SetCursorPosition(0, Console.CursorTop);
+            for (int i = 0; i < Console.WindowWidth; i++)
+                Console.Write(" ");
+            Console.SetCursorPosition(0, currentLineCursor);
+        }
+        #endregion
+
+        private static void SetBranch(List<Project> projects, string branchNumber)
+        {
+            var title = Console.Title;
+            var idx = title.IndexOf(" - P4Cmd", StringComparison.OrdinalIgnoreCase);
+            if (idx >= 0)
+            {
+                Console.Title = $"{title.Substring(0, idx)} - P4Cmd on branch {branchNumber} (V{AppVersion})";
+            }
+            else
+            {
+                Console.Title = $"{title} - P4Cmd on branch {branchNumber} (V{AppVersion})";
+            }
+
+            for (int i = 0; i < projects.Count; i++)
+            {
+                //if(projects[i].Path == "") continue;
+                projects[i].Path = RegBranch.Replace(projects[i].Path, "\\" + branchNumber + "\\");
+                projects[i].Path = projects[i].Path.Replace("\\59\\", "\\" + branchNumber + "\\").Replace("{Branch}", branchNumber.ToString());
+
+                projects[i].Entry = RegBranch.Replace(projects[i].Entry, "\\" + branchNumber + "\\");
+                projects[i].Entry = projects[i].Entry.Replace("\\59\\", "\\" + branchNumber + "\\").Replace("{Branch}", branchNumber.ToString());
+            }
+        }
+
+        #region --Serialization--
+        static void SerializeToXml<T>(T obj, string path = @".\projects.xml") where T : class
+        {
+            if (obj == null) return;
+            using (StreamWriter sw = new StreamWriter(path, false, Encoding.UTF8))
+            {
+                XmlSerializer xmlSerializer = new XmlSerializer(typeof(T));
+
+                xmlSerializer.Serialize(sw, obj);
+            }
+        }
+        static T Deserialize<T>(string path = @".\Projects.xml") where T : class
+        {
+            using (Stream strm = File.OpenRead(path))
+            {
+                XmlSerializer xmlSerializer = new XmlSerializer(typeof(T));
+                var result = xmlSerializer.Deserialize(strm) as T;
+                return result;
+            }
+        }
+        #endregion
+
+        static Project GetProj(string projName)
+        {
+            var proj = CurrentProjects.FirstOrDefault<Project>(p => p.Name.Equals(projName, StringComparison.OrdinalIgnoreCase));
+
+            if (proj == null)
+                proj = CurrentProjects.FirstOrDefault(p => p.Name.IndexOf(projName, StringComparison.OrdinalIgnoreCase) != -1);
+
+            return proj;
+        }
+
+        #region --Action--
+        static void GoAction(string command, string action, string projNoOrName,
+            List<Project> projects,
+            Dictionary<string, string> parameters = null)
+        {
+            var branchName = string.Empty;
+            parameters.TryGetValue("branch", out branchName);
+            branchName = branchName ?? _workingBranch ?? "current";
+            if (_enableLog) Console.WriteLine($"command: {command} proj: {projNoOrName} branch: {branchName} , {string.Join(",", parameters.Select(kv => $"{kv.Key}:{kv.Value}"))}");
+            parameters = parameters ?? new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            projNoOrName = projNoOrName ?? string.Empty;
+            Project project = null;
+
+            if (!string.IsNullOrEmpty(projNoOrName))
+            {
+                if (projNoOrName.All(c => Char.IsNumber(c)))
+                {
+                    project = AllProjects.FirstOrDefault(o => o.Index == Convert.ToInt32(projNoOrName)); //GetProj(Convert.ToInt32(projNoOrName));
+                }
+                else if (projNoOrName.Length <= 3)
+                {
+                    WriteLineIdt("to match project better, please use number or at least 3 characters for project");
+                    return;
+                }
+                else
+                {
+                    project = GetProj(projNoOrName);
+                }
+            }
+
+            if (project == null
+                && AllCommandNames.IndexOf("," + command + ",", StringComparison.OrdinalIgnoreCase) == -1
+                && false == ("sync" == command.ToLower() && "all" == projNoOrName.ToLower()))
+            {
+                WriteLineIdt($"cannot find the project or command '{projNoOrName}', it needs project name or number");
+                return;
+            }
+
+            try
+            {
+                if (command.Equals("open", StringComparison.OrdinalIgnoreCase))
+                {
+                    Open(project, branchName, parameters);
+                }
+                else if (command.Equals("start", StringComparison.OrdinalIgnoreCase))
+                {
+                    Start(project, parameters.ContainsKey("host") ? parameters["host"] : string.Empty);
+                }
+                else if (command.Equals("db", StringComparison.OrdinalIgnoreCase))
+                {
+                    try { DbInfo(parameters.ContainsKey("dbName") ? parameters["dbName"] : null); }
+                    catch (Exception exx98) { WriteLineIdt(exx98.Message); }
+                }
+                else if (command.Equals("cmd", StringComparison.OrdinalIgnoreCase))
+                {
+                    Process.Start("cmd.exe");
+                }
+                else if (command.Equals("wiki", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (project != null) OpenWiki(project);
+                    else Process.Start("https://github.com/sw0/p4cmd");
+                }
+                else if (command.Equals("p4v", StringComparison.OrdinalIgnoreCase))
+                {
+                    Process.Start("p4v");
+                }
+                else if (command.StartsWith("notepad", StringComparison.OrdinalIgnoreCase))
+                {
+                    var npProcess = command.EndsWith("++") ? @"C:\Program Files (x86)\Notepad++\notepad++.exe" : "notepad.exe";
+                    Process.Start(npProcess);
+                }
+                else if (command.Equals("wcf", StringComparison.OrdinalIgnoreCase) || command.Equals("wcftc", StringComparison.OrdinalIgnoreCase))
+                {
+                    Process.Start(_wcfTestClientLocation);
+                }
+                else if (command.Equals("inetmgr", StringComparison.OrdinalIgnoreCase))
+                {
+                    Process.Start(@"C:\Windows\System32\inetsrv\inetmgr.exe");
+                }
+                else if (command.Equals("mmc", StringComparison.OrdinalIgnoreCase))
+                {
+                    Process.Start(@"C:\Windows\System32\mmc.exe");
+                }
+                else if (command.Equals("eventviewer", StringComparison.OrdinalIgnoreCase))
+                {
+                    Process.Start(@"eventvwr.msc", "/s");
+                }
+                else if (command.Equals("Ssms", StringComparison.OrdinalIgnoreCase) || command.Equals("sql", StringComparison.OrdinalIgnoreCase))
+                {
+                    var loc = ConfigurationManager.AppSettings["SsmsLocation"];
+                    loc = string.IsNullOrEmpty(loc) ? @"C:\Program Files (x86)\Microsoft SQL Server\100\Tools\Binn\VSShell\Common7\IDE\Ssms.exe" : loc;
+                    try
+                    {
+                        Process.Start(loc);
+                    }
+                    catch { WriteLineIdt($"Failed to run {loc}"); }
+                }
+                else if (command.Equals("ping", StringComparison.OrdinalIgnoreCase))
+                {
+                    //TODO ping
+                    var sCmdText = $@"ping {action}";
+                    var p = new Process();
+                    p.StartInfo.FileName = "cmd.exe";
+                    p.StartInfo.Arguments = sCmdText;
+                    p.StartInfo.RedirectStandardOutput = false;
+                    p.StartInfo.UseShellExecute = false;
+                    p.StartInfo.CreateNoWindow = true;
+                    p.Start();
+                }
+                else if (command.Equals("hosts", StringComparison.OrdinalIgnoreCase))
+                {
+                    ProcessHostsCmd(action, parameters);
+                }
+                else if (command.Equals("iisreset", StringComparison.OrdinalIgnoreCase))
+                {
+                    Process.Start("iisreset.exe");
+                }
+                else if ((new[] { "postman", "pm" }).Contains(command.ToLower()))
+                {
+                    StartPostman();
+                }
+                else if (command.Equals("list", StringComparison.OrdinalIgnoreCase) || command.Equals("ls", StringComparison.OrdinalIgnoreCase))
+                {
+                    var team = parameters.ContainsKey("team") ? parameters["team"] : _defaultTeams;
+                    var category = parameters.ContainsKey("category") ? parameters["category"] : "";
+                    var name = parameters.ContainsKey("name") ? parameters["name"] : "";
+                    ListProjects(team.Split(new[] { ',', ' ' }, StringSplitOptions.RemoveEmptyEntries), category, name);
+                }
+                else if (command.Equals("set", StringComparison.OrdinalIgnoreCase))
+                {
+                    ProcessSetCmd(project, parameters);
+                }
+                else if (command.Equals("help", StringComparison.OrdinalIgnoreCase) || "?" == command)
+                {
+                    Help();
+                }
+                else if (command.Equals("build", StringComparison.OrdinalIgnoreCase) || command.Equals("bld", StringComparison.OrdinalIgnoreCase))
+                {
+                    Build(project, branchName);
+                }
+                else if (command.Equals("folder", StringComparison.OrdinalIgnoreCase) || command.Equals("fld", StringComparison.OrdinalIgnoreCase))
+                {
+                    ProcessFolderCmd(project, branchName, parameters);
+                }
+                else if (command.Equals("code", StringComparison.OrdinalIgnoreCase))
+                {
+                    CodeFolder(project, branchName);
+                }
+                else if (command.Equals("sync", StringComparison.OrdinalIgnoreCase))
+                {
+                    Sync(project, branchName, parameters.ContainsKey("f") || parameters.ContainsKey("force"));
+                }
+                else if (command.Equals("url", StringComparison.OrdinalIgnoreCase))
+                {
+                    ProcessUrlCmd(project, parameters);
+                }
+                else if (command.Equals("desc", StringComparison.OrdinalIgnoreCase) || command.Equals("describe", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (project == null)
+                    {
+                        //show all the projects
+                        projects.ForEach(p => Console.WriteLine(p.ToDescriptionString(branchName)));
+                    }
+                    else
+                    {
+                        //show the project
+                        Console.WriteLine(project.ToDescriptionString(branchName));
+                    }
+                }
+                else
+                {
+                    WriteLineIdt($"the command '{command}' is not supported yet");
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.ForegroundColor = ConsoleColor.Red;
+                WriteLineIdt($"Error: {ex.Message}");
+                WriteLineIdt("Reminder: please check whether you run this as administrator mode");
+                Console.ResetColor();
+            }
+        }
+
+        static void ProcessHostsCmd(string action, Dictionary<string, string> parameters)
+        {
+            /**
+             * NOTE: I want to merge all the hosts file for given branch/environment
+             * > hosts set env:dev-int
+             * > hosts set for:repo1,repo2,repo3 env:DEV merge:dev-int (default)
+             */
+            var repositories = new List<string>();
+            var env = string.Empty;
+            if (parameters.TryGetValue("for", out var forStr))
+            {
+                repositories = forStr.ToLower().Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries)
+                    .Where(row => row != "default").Distinct().ToList();
+            }
+            if (repositories.Count == 0) repositories.Add("default");
+
+            if (!parameters.TryGetValue("environment", out env) && !parameters.TryGetValue("branch", out env))
+                env = repositories.FirstOrDefault() == "default" ? "local" : "DEV"; //'DEV' for SDLC, repo1, repo2
+
+            if (repositories.All(row => row != "default") && env == "integration") env = "INT"; //FOR SDLC, repo1, repo2, folder is INT for integration branch
+
+            if (string.IsNullOrEmpty(action)) action = "open";
+            action = action.ToLower();
+            if (action == "fld") action = "folder";
+
+            var dicKey = $"{repositories.FirstOrDefault()}({env})".ToLower();
+
+            if (action == "open" || action == "set" || action == "find" || action == "restore" || action == "fld" || action == "folder")
+            {
+                var file = string.Empty;
+                if (!HostsRepositories.TryGetValue(dicKey, out file))
+                {
+                    var availKeys = HostsRepositories.Keys
+                        .Where(k => k.Contains(dicKey.Substring(0, dicKey.IndexOf('('))))
+                        .Select(k => k.Substring(k.IndexOf('(')).Trim('(', ')')).ToList();
+                    WriteLineIdt($"hosts file not found for key: {dicKey}, try env:{string.Join("|", availKeys)}");
+                    return;
+                }
+
+                if (action == "open" || action == "folder")
+                {
+                    if (action == "open" && File.Exists(file))
+                    {
+                        Process.Start("notepad.exe", file);
+                        WriteLineIdt($"open {file}");
+                        return;
+                    }
+
+                    if (action == "folder")
+                    {
+                        Process.Start(FolderHost);
+                        return;
+                    }
+
+                    WriteLineIdt($"file not found: {file}");
+                }
+
+                if (action == "set" || action == "restore")
+                {
+                    if (action == "set" && (!parameters.ContainsKey("environment") && !parameters.ContainsKey("branch")))
+                    {
+                        WriteLineIdt($"invalid input. example: > hosts set env:QA for:repo1");
+                        return;
+                    }
+                    var localHostFile = HostsRepositories["default(local)"];
+                    var attributes = File.GetAttributes(localHostFile);
+                    if ((attributes & FileAttributes.ReadOnly) == FileAttributes.ReadOnly)
+                        File.SetAttributes(localHostFile, attributes ^ FileAttributes.ReadOnly);
+
+                    //var src = file;
+                    if (action == "set")
+                    {
+                        if (repositories.Count > 1)
+                        {
+                            //merge hosts
+                            var defaultEnv2Merge = string.Empty;
+                            parameters.TryGetValue("merge", out defaultEnv2Merge);
+
+                            var mergedHostContent = MergeHostEntries(repositories, env, defaultEnv2Merge);
+
+                            File.Copy(localHostFile, localHostFile + DateTime.Now.ToString("_yyyyMMddmmss"));
+                            File.WriteAllText(localHostFile, mergedHostContent);
+                            WriteLineIdt($"hosts updated with merged hosts from `{string.Join(",", repositories)}{(defaultEnv2Merge == null ? "" : $",default({defaultEnv2Merge})")}` successfully");
+                        }
+                        else
+                        {
+                            File.Copy(localHostFile, localHostFile + DateTime.Now.ToString("_yyyyMMddmmss"));
+                            File.Copy(file, localHostFile, true);
+                            WriteLineIdt($"copied `{file}` successfully");
+                        }
+                    }
+                    else // restore
+                    {
+                        file = HostsRepositories["default(mine)"];
+                        if (!File.Exists(file))
+                        {
+                            WriteLineIdt($"You did not got custom hosts file set: {file}");
+                            return;
+                        }
+                        File.Copy(file, localHostFile, true);
+                        WriteLineIdt($"copied `{file}` successfully");
+                    }
+
+                    attributes = File.GetAttributes(localHostFile);
+                    if ((attributes & FileAttributes.ReadOnly) == FileAttributes.ReadOnly)
+                        File.SetAttributes(localHostFile, attributes ^ FileAttributes.ReadOnly);
+                }
+
+                if (action == "find")
+                {
+                    if (parameters.TryGetValue("host", out var host))
+                    {
+                        var content = File.ReadAllText(file);
+                        var regText = $@"^\s*(?<ip>[\d\.]+)\s+{host.Replace(".", "\\.")}.*$|^\s*{host.Replace(".", "\\.")}.+$";
+                        var reg = new Regex(regText, RegexOptions.IgnoreCase | RegexOptions.Multiline);
+                        //Console.WriteLine(regText);
+                        var found = false;
+                        var m = reg.Match(content);
+                        while (m.Success)
+                        {
+                            var value = Regex.Replace(m.Groups[0].Value.Trim(), @"\s{2,}", "  ");
+                            WriteLineIdt($"find `{value}` ({env}) from {file}");
+                            m = m.NextMatch();
+                            found = true;
+                        }
+
+                        if (found) return;
+                        WriteLineIdt($"cannot find host entry for {host} in ({env}) from file: {file}");
+
+                        return;
+                    }
+                    WriteLineIdt("please pass host parameter like host:server1v3 or h:server1");
+                }
+
+                return;
+            }
+
+            WriteLineIdt("not supported action for command 'hosts'");
+        }
+
+        static void ProcessUrlCmd(Project project, Dictionary<string, string> parameters)
+        {
+            string url = null;
+            if (parameters.TryGetValue("type", out var type) && ",tc,teamcity,".Contains($",{type},".ToLower()))
+            {
+                type = type.ToLower();
+                if (type == "tc") type = "teamcity";
+                var tmp = project.Endpoints?.FirstOrDefault(end =>
+                    type.Equals(end.Type, StringComparison.OrdinalIgnoreCase) && !string.IsNullOrEmpty(end.Url))?.Url;
+                if (!string.IsNullOrEmpty(tmp)) url = tmp;
+            }
+
+            url = url ?? project.Url ?? project.Endpoints?.FirstOrDefault(end => !string.IsNullOrEmpty(end.Url))?.Url;
+
+            if (string.IsNullOrEmpty(url))
+            {
+                WriteLineIdt($"url or endpoints is/are not set for the project: {project?.Name}");
+                return;
+            }
+
+            if (parameters.ContainsKey("copy"))
+            {
+                Clipboard.SetText(url);
+                WriteLineIdt($"url copied to clipboard: {project?.Name}");
+            }
+            else
+            {
+                Process.Start(url);
+                return;
+            }
+        }
+
+        private static string MergeHostEntries(List<string> repositories, string env, string defaultEnvToMerge)
+        {
+            var sb = new StringBuilder();
+
+            const int repeatCount = 50;
+
+            sb.Append('-', repeatCount).AppendLine().AppendLine("Generated by following command:");
+            sb.Append("  " + CurrentCommand).AppendLine().Append('-', repeatCount).AppendLine("\r\n");
+
+            var files = repositories.Distinct().Select(repository =>
+            {
+                var dicKey = $"{repository}({env})".ToLower();
+                if (HostsRepositories.ContainsKey(dicKey))
+                    return HostsRepositories[dicKey];
+                return null;
+            }).Where(o => o != null).ToDictionary(item => item, item => env);
+
+            if (files.Count > 1)
+            {
+                files.Add(FolderHost + "hosts-to-append", "my-custom-hosts");
+            }
+
+            if (!string.IsNullOrEmpty(defaultEnvToMerge))
+            {
+                var defaultEnvHost = $"default({defaultEnvToMerge})".ToLower();
+                if (HostsRepositories.ContainsKey(defaultEnvHost))
+                {
+                    if (!files.ContainsKey(HostsRepositories[defaultEnvHost]))
+                        files.Add(HostsRepositories[defaultEnvHost], defaultEnvToMerge);
+                }
+                else
+                {
+                    WriteLineIdt($"env value {defaultEnvToMerge} for `default` repositories in `merge:` is invalid and got ignored");
+                }
+            }
+
+            var dic = new Dictionary<string, string>();
+            var hosts = new HashSet<string>();
+            var regHostEntry = new Regex(@"^\s*([^\s#]+)\s+([^\s]+)\s*$", RegexOptions.Multiline | RegexOptions.Compiled);
+            foreach (var kvp in files.ToArray().ToList().OrderBy(o => o.Key))
+            {
+                var file = kvp.Key;
+                var envDescription = kvp.Value;
+
+                var fileExists = File.Exists(file);
+
+                if (file.EndsWith("hosts-to-append") && !fileExists) continue;
+
+                sb.AppendLine(new string('#', repeatCount));
+                sb.AppendLine(!fileExists ? $"# FILE NOT FOUND: {file}" : $"# {file}");
+                sb.AppendLine(new string('#', repeatCount) + Environment.NewLine);
+                if (fileExists)
+                {
+                    var content = File.ReadAllText(file);
+                    var m = regHostEntry.Match(content);
+                    while (m.Success)
+                    {
+                        var host = m.Groups[2].Value.ToLower();
+                        var row = (m.Groups[1].Value.PadRight(20) + host.PadRight(36)).ToLower();
+                        if (hosts.Contains(host))
+                        {
+                            m = m.NextMatch();
+
+                            continue;
+                        }
+                        hosts.Add(host);
+                        if (!dic.ContainsKey(row))
+                        {
+                            dic.Add(row, envDescription);
+
+                            sb.AppendLine($"{row}\t#{envDescription}");
+                        }
+
+                        m = m.NextMatch();
+                    }
+
+                    sb.AppendLine();
+                }
+            }
+            return sb.ToString();
+        }
+
+        static void ProcessSetCmd(Project proj, Dictionary<string, string> parameters)
+        {
+            if (parameters.Count == 0)
+            {
+                WriteLineIdt("no parameter set like b:int dbg:1 --dbg");
+                return;
+            }
+
+            if (parameters.TryGetValue("branch", out string branch))
+            {
+                if (!RegBranch.IsMatch("\\" + branch + "\\"))
+                {
+                    WriteLineIdt($"branch `{branch}` is invalid");
+                    return;
+                }
+
+                _workingBranch = branch;
+                SetBranch(CurrentProjects, branch);
+            }
+
+            if (parameters.TryGetValue("debug", out string debug))
+            {
+                _enableLog = debug != "false" && debug != "0";
+            }
+        }
+        private static void Help()
+        {
+            var old = Console.ForegroundColor;
+            Console.ForegroundColor = ConsoleColor.DarkYellow;
+            foreach (var row in CmdSamples)
+            {
+                WriteLineIdt($"{row.Key}\t{row.Value}");
+            }
+            Console.ForegroundColor = old;
+        }
+
+        public static string GetBranchedPath(string path, string newBranchName)
+        {
+            var tmp = RegBranch.Replace(path, "\\" + newBranchName + "\\");
+            return tmp;
+        }
+
+        static void Open(Project proj, string branchName, Dictionary<string, string> parameters)
+        {
+            if (parameters.ContainsKey("for") && "wiki".Equals(parameters["for"].ToLower()))
+            {
+                OpenWiki(proj);
+            }
+            else if (parameters.ContainsKey("for") && "url".Equals(parameters["for"].ToLower()))
+            {
+                OpenUrl(proj);
+            }
+            else if (!string.IsNullOrWhiteSpace(proj.Path))
+            {
+                var projectPath = GetBranchedPath(proj.Path, branchName);
+                if (File.Exists(projectPath))
+                {
+                    WriteLineIdt($"opening {projectPath}");
+                    Process.Start(projectPath);
+                    return;
+                }
+
+                WriteIdt($"not found: {projectPath}");
+                if (Console.CursorLeft > 0 && Console.CursorLeft != Console.WindowWidth) Console.WriteLine();
+                WriteLineIdt("please sync the code firstly like 'sync <projNameOrNo> [b:integration]'.");
+            }
+            else
+            {
+                WriteLineIdt($"the solution/project path was not set for Project '{proj.Name}'");
+            }
+        }
+
+        private static void OpenUrl(Project project)
+        {
+            var url = project.Url ?? project.Endpoints?.FirstOrDefault(end => !string.IsNullOrEmpty(end.Url))?.Url;
+            if (!string.IsNullOrEmpty(url)) Process.Start(url);
+            else WriteLineIdt($"url or endpoints is/are not set for the project: {project?.Name}");
+        }
+        private static void OpenWiki(Project project)
+        {
+            var url = project.Wiki;
+            if (!string.IsNullOrEmpty(url)) Process.Start(url);
+            else WriteLineIdt($"wiki page is not set for the project: {project?.Name}");
+        }
+
+        static void ProcessFolderCmd(Project proj, string branchName, IDictionary<string, string> parameters)
+        {
+            var path = string.Empty;
+            if (proj == null)
+            {
+                var codeBase = Assembly.GetEntryAssembly().CodeBase;
+                codeBase = Path.GetDirectoryName(codeBase);
+                path = codeBase;
+            }
+            else
+            {
+                path = proj.Path;
+
+                if (!string.IsNullOrWhiteSpace(proj.Path))
+                {
+                    path = Path.GetDirectoryName(GetBranchedPath(path, branchName));
+                }
+            }
+
+            if (!string.IsNullOrWhiteSpace(path))
+            {
+                if (parameters != null && parameters.ContainsKey("copy"))
+                {
+                    Clipboard.SetText(path);
+                    WriteLineIdt($"path copied to clipboard: {path}");
+                    return;
+                }
+                WriteLineIdt($"Opening {path}");
+                Process.Start(path);
+            }
+            else
+            {
+                WriteLineIdt($"The solution/project path was not set for Project '{proj?.Name}'");
+            }
+        }
+
+        static void CodeFolder(Project proj, string branchName)
+        {
+            WriteLineIdt(proj.Path);
+            if (!string.IsNullOrWhiteSpace(proj.Path))
+            {
+                var path = Path.GetDirectoryName(GetBranchedPath(proj.Path, branchName));
+                WriteLineIdt($"Opening {path}");
+                var p = new Process { StartInfo = { FileName = "code", Arguments = path } };
+                p.Start();
+            }
+            else
+            {
+                WriteLineIdt($"the solution/project path was not set for Project '{proj.Name}'");
+            }
+        }
+
+        static void Start(Project proj, string host)
+        {
+            if (!string.IsNullOrWhiteSpace(proj.Url))
+            {
+                Uri u = null;
+
+                try
+                {
+                    u = new Uri(proj.Url);
+
+                    if (!string.IsNullOrEmpty(host))
+                    {
+                        if (u.Port == 80)
+                        {
+                            u = new Uri(u.Scheme + "://" + host + u.PathAndQuery);
+                        }
+                        else
+                        {
+                            u = new Uri(u.Scheme + ":" + u.Port + "//" + host + u.PathAndQuery);
+                        }
+                    }
+
+                    WriteLineIdt($"Starting {u}");
+                    Process.Start(u.AbsoluteUri);
+                    return;
+                }
+                catch { }
+            }
+
+            WriteLineIdt($"The solution/project Url was not set for Project '{proj.Name}'");
+        }
+
+        static void StartPostman()
+        {
+            var pathWithEnv = @"%USERPROFILE%\AppData\Local\Postman\";
+            var filePath = Environment.ExpandEnvironmentVariables(pathWithEnv);
+            string pmLocation = null;
+            if (Directory.Exists(filePath))
+            {
+                pmLocation = filePath;
+
+                if (pmLocation != null && File.Exists(pmLocation = pmLocation + "\\update.exe"))
+                {
+                    try
+                    {
+                        Process myProcess = new Process();
+                        myProcess.StartInfo.Arguments = " --processStart \"Postman.exe\"";
+                        myProcess.StartInfo.UseShellExecute = false;
+                        myProcess.StartInfo.FileName = pmLocation;
+                        myProcess.StartInfo.CreateNoWindow = false;
+                        myProcess.EnableRaisingEvents = false;
+                        myProcess.Start();
+                        myProcess.Close();
+                        return;
+                    }
+                    catch { }
+                }
+            }
+            WriteLineIdt($"Cannot found postman in location: {pmLocation}");
+        }
+
+        static void Sync(Project proj, string branchName, bool force)
+        {
+            if (File.Exists("sync.cmd"))
+            {
+                WriteLineIdt($"call sync.cmd {proj.Name} {branchName}, force: {force.ToString().ToLower()}");
+                SyncCode("sync.cmd", proj.Name, branchName, force);
+            }
+            else
+            {
+                WriteLineIdt($"Batch file did not set for Project '{proj.Name}'");
+            }
+        }
+        static void Build(Project proj, string branchName)
+        {
+            if (proj != null)
+            {
+                if (!string.IsNullOrEmpty(proj.Path))
+                    BuildProjectOrSolution(GetBranchedPath(proj.Path, branchName));
+                else
+                    WriteLineIdt($"Path is empty for Project {proj.Name} on { GetBranchedPath(proj.Path, branchName)}");
+            }
+        }
+
+        static void DbInfo(string dbName = null)
+        {
+            const string format = @"C:\Windows\Microsoft.NET\{0}\{1}\Config\machine.config";
+
+            var places = new[]{
+                new {Framwork = "Framework", ClrVersion= "v2.0.50727"},
+                new {Framwork = "Framework", ClrVersion= "v4.0.30319"},
+                new {Framwork = "Framework64", ClrVersion= "v2.0.50727"},
+                new {Framwork = "Framework64", ClrVersion= "v4.0.30319"},
+            };
+
+            foreach (var place in places)
+            {
+                var xml = new XmlDocument();
+                var xmlPath = string.Format(format, place.Framwork, place.ClrVersion);
+                xml.Load(xmlPath);
+                Console.WriteLine(xmlPath);
+                var databases = xml.SelectNodes("//Connections/*");
+
+                foreach (XmlNode db in databases)
+                {
+                    if (!string.IsNullOrEmpty(dbName) && false == db.Name.Equals(dbName, StringComparison.OrdinalIgnoreCase)) continue;
+                    //Console.WriteLine(db.Name);
+                    WriteLineIdt("{0,-12}: {1,-10} => {2} : {3}",
+                                db.Name,
+                                db.SelectSingleNode("add[@key='Database']").Attributes["value"].Value,
+                                db.SelectSingleNode("add[@key='Server']").Attributes["value"].Value,
+                                db.SelectSingleNode("add[@key='Hashvar']").Attributes["value"].Value);
+                }
+            }
+        }
+        #endregion
+
+        static P4CmdProfile GetP4CmdProfile()
+        {
+            try
+            {
+                var profile = Deserialize<P4CmdProfile>(ProfileFileName);
+                profile?.Projects?.ForEach((p) =>
+                {
+                    if (p.Path?.Length > 0 && !p.Path.StartsWith(_p4Workspace, StringComparison.OrdinalIgnoreCase))
+                    {
+                        p.Path = _regP4Workspace.Replace(p.Path, _p4Workspace);
+                    }
+                    if (p.Entry?.Length > 0 && !p.Entry.StartsWith(_p4Workspace, StringComparison.OrdinalIgnoreCase))
+                    {
+                        p.Entry = _regP4Workspace.Replace(p.Entry, _p4Workspace);
+                    }
+                    p.Owner = p.Owner ?? string.Empty;
+                    p.Category = p.Category ?? string.Empty;
+                    p.Path = p.Path ?? string.Empty;
+                    p.Entry = p.Entry ?? string.Empty;
+                });
+                if (profile != null && profile.Projects != null)
+                {
+                    var projects = profile.Projects;
+                    for (var i = 1; i <= projects.Count; i++) projects[i - 1].Index = i;
+                }
+
+                return profile;
+            }
+            catch (Exception ex)
+            {
+                WriteLineIdt("error occurred when loading profile file:");
+                WriteLineIdt(ex.Message);
+                throw;
+            }
+        }
+        static List<Project> GetProjects()
+        {
+            try
+            {
+                var projects = Deserialize<List<Project>>();
+                projects.ForEach((p) =>
+                {
+                    if (p.Path?.Length > 0 && !p.Path.StartsWith(_p4Workspace, StringComparison.OrdinalIgnoreCase))
+                    {
+                        p.Path = _regP4Workspace.Replace(p.Path, _p4Workspace);
+                    }
+                    if (p.Entry?.Length > 0 && !p.Entry.StartsWith(_p4Workspace, StringComparison.OrdinalIgnoreCase))
+                    {
+                        p.Entry = _regP4Workspace.Replace(p.Entry, _p4Workspace);
+                    }
+                    p.Owner = p.Owner ?? string.Empty;
+                    p.Category = p.Category ?? string.Empty;
+                    p.Path = p.Path ?? string.Empty;
+                    p.Entry = p.Entry ?? string.Empty;
+                });
+                for (var i = 1; i <= projects.Count; i++) projects[i - 1].Index = i;
+                return projects;
+            }
+            catch (Exception ex)
+            {
+                WriteLineIdt(ex.Message);
+                return new List<Project>();
+            }
+        }
+
+        static void BuildProjectOrSolution(string target2Build, string clrVersion = "4.0")
+        {
+            string targetDir = string.Format(@".");//this is where mybatch.bat lies
+            var proc = new Process();
+            proc.StartInfo.WorkingDirectory = targetDir;
+            proc.StartInfo.FileName = "C:\\Windows\\Microsoft.NET\\Framework64\\v4.0.30319\\MSBuild.exe";
+            proc.StartInfo.Arguments = string.Format("{0} /property:Configuration=Debug", target2Build);//this is argument
+            proc.StartInfo.CreateNoWindow = false;
+            proc.Start();
+        }
+
+        static void SyncCode(string batchFile, string projectName, string branchName, bool force)
+        {
+            if (string.IsNullOrEmpty(batchFile)) throw new ArgumentNullException("batchFile");
+            var targetDir = string.Format(@".");//this is where sync.cmd lies
+            var proc = new Process();
+            proc.StartInfo.WorkingDirectory = targetDir;
+            proc.StartInfo.FileName = batchFile;
+            proc.StartInfo.Arguments = $"{projectName} {branchName} {(force ? "-f" : "")}";
+            proc.StartInfo.CreateNoWindow = false;
+            proc.Start();
+        }
+
+        static void InitParametersMappings()
+        {
+            var keyMappingList = string.Concat(ConfigurationManager.AppSettings["DefaultOptionKeyMappings"]
+                , ";", ConfigurationManager.AppSettings["CustomOptionKeyMappings"])
+                .Split(new[] { ' ', ';' }, StringSplitOptions.RemoveEmptyEntries)
+                .ToList();
+
+            keyMappingList.ForEach(row =>
+            {
+                var kvp = row.Split(new[] { ':' }, StringSplitOptions.RemoveEmptyEntries);
+                if (kvp.Length == 2 && kvp[0].Length > 0 && kvp[1].Length > 0)
+                {
+                    var keys = kvp[0].ToLowerInvariant().Split(new[] { ' ', ',' }, StringSplitOptions.RemoveEmptyEntries);
+                    keys.ToList().ForEach(key =>
+                    {
+                        if (!KeyMapping.ContainsKey(key)) KeyMapping[key] = kvp[1];
+                    });
+                }
+            });
+
+
+            var valueMappingList = string.Concat(ConfigurationManager.AppSettings["DefaultOptionValueMappings"]
+                , ";", ConfigurationManager.AppSettings["CustomOptionValueMappings"])
+                .Split(new[] { ' ', ';' }, StringSplitOptions.RemoveEmptyEntries)
+                .ToList();
+
+            valueMappingList.ForEach(row =>
+            {
+                var kvp = row.ToLowerInvariant().Split(new[] { ':' }, StringSplitOptions.RemoveEmptyEntries);
+                if (kvp.Length == 2 && kvp[0].Length > 0 && kvp[1].Length > 0)
+                {
+                    var keys = kvp[0].ToLowerInvariant().Split(new[] { ' ', ',' }, StringSplitOptions.RemoveEmptyEntries);
+                    keys.ToList().ForEach(key =>
+                    {
+                        if (!ValueMapping.ContainsKey(key)) ValueMapping[key] = kvp[1];
+                    });
+                }
+            });
+        }
+
+        static Dictionary<string, string> ResolveOptions(string cmd, string action, string[] args, bool normalizeKeyValues = true)
+        {
+            action = (action ?? "").ToLower();
+            var dic = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            if (args == null || args.Length == 0) return dic;
+            foreach (var arg in args)
+            {
+                var m = RegArgs.Match(arg);
+                if (m.Success)
+                {
+                    var key = m.Groups["optkey"].ToString();
+                    var value = m.Groups["optval"].ToString();
+                    if (key != "") dic[key] = value;
+                    key = m.Groups["optflag"].ToString().ToLower();
+                    if (key != "") dic[key] = "true";
+                }
+            }
+
+            if (args.Length == 1 && dic.Count == 0 && cmd != null)
+            {
+                //set default parameters if RegArgs not matched
+                var val = args[0];
+                var tmp = string.Concat(",", cmd, ",").ToLower();
+                if (",ls,list,".Contains(tmp)) dic["name"] = val;
+                if (",sync,bld,build,code,fld,folder,".Contains(tmp)) dic["branch"] = val;
+                if (",wiki,url,".Contains(tmp)) dic["type"] = val;
+                if (",hosts,".Contains(tmp) && ",open,set,".Contains("," + action + ",")) dic["environment"] = val;
+                if (",hosts,".Contains(tmp) && ",find,".Contains("," + action + ",")) dic["host"] = val;
+            }
+
+            if (normalizeKeyValues)
+            {
+                var dic2 = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                foreach (var kvp in dic)
+                {
+                    var key = kvp.Key;
+                    var value = kvp.Value;
+                    if (KeyMapping.ContainsKey(key)) key = KeyMapping[key];
+                    if (ValueMapping.ContainsKey(value)) value = ValueMapping[value];
+
+                    dic2.Add(key, value);
+                }
+
+                return dic2;
+            }
+
+            return dic;
+        }
+
+        static void WriteLine(string msg)
+        {
+            Console.WriteLine(msg);
+        }
+        static void WriteIdt(string msg)
+        {
+            Console.Write(new string(' ', Indent) + msg);
+        }
+
+        static void WriteLineIdt(string msg, params object[] args)
+        {
+            Console.WriteLine(new string(' ', Indent) + msg, args);
+        }
+
+        static void SetupSampleProfile(IDictionary<string, string> options)
+        {
+            var profile = new P4CmdProfile()
+            {
+                CmdEntries = new List<CmdEntry> {
+                    new CmdEntry
+                    {
+                        Owner="all",
+                        Enabled = true,
+                        CmdName = "reg",
+                        Process = "http://www.tainisoft.com/tools/p4cmd",
+                    }
+                },
+                Projects = new List<Project>
+                {
+                    new Project
+                    {
+                        Enabled=true,
+                        Owner="alpha",
+                        Name ="Slin.MaskEngine",
+                        Path = @"c:\p4\slin\Slin.MaskEngine\Slin.MaskEngine.sln",
+                        Wiki = "https://github.com/sw0/Slin.MaskEngine",
+                        Endpoints = new List<Endpoint>
+                        {
+                            new Endpoint{ Type = "Swagger", Url = "https://api.tainisoft.com/api/maskengine/swagger/" }
+                        }
+                    },
+                    new Project
+                    {
+                        Enabled=true,
+                        Owner="team8",
+                        Name ="RegexTool",
+                        Path = @"c:\p4\slin\RegexTool\RegexTool.sln",
+                        Wiki = "https://github.com/sw0/RegexTool"
+                    }
+                }
+            };
+
+            if (!File.Exists(ProfileFileName) || options.ContainsKey("overwrite"))
+            {
+                SerializeToXml(profile, ProfileFileName);
+                WriteLineIdt("test projects.xml setup!");
+            }
+        }
+    }
+
+    public class P4CmdProfile
+    {
+        public List<CmdEntry> CmdEntries { get; set; }
+        public List<Project> Projects { get; set; }
+    }
+
+    public class Project
+    {
+        [XmlIgnore]
+        public int Index { get; set; }
+        public string Category { get; set; }
+        public string Name { get; set; }
+        public string Owner { get; set; }
+        /// <summary>
+        /// URL: TODO use Endpoint instead
+        /// </summary>
+        public string Url { get; set; }
+        public string Path { get; set; }
+        public string Entry { get; set; }
+        public string P4SyncBat { get; set; }
+        public string Description { get; set; }
+        public string Wiki { get; set; }
+
+        public List<Endpoint> Endpoints { get; set; }
+
+        [XmlAttribute] public bool Enabled { get; set; } = true;
+
+        public string ToDescriptionString(string branchName = null, bool detailed = false)
+        {
+            var solution = branchName == null ? Path : Program.GetBranchedPath(Path, branchName);
+            var entry = branchName == null ? Entry : Program.GetBranchedPath(Entry, branchName);
+            var endpoints = this.Endpoints?.Where(end => !string.IsNullOrEmpty(end.Url));
+            var urls = string.Join("\r\n\t", endpoints.Select(end => end.Url).ToList());
+
+            return $@"{Name}({Category}) | {Owner} | {Url ?? endpoints?.FirstOrDefault()?.Url}
+  {solution}
+  {entry}
+  {urls}
+  {P4SyncBat}".TrimEnd();
+        }
+    }
+
+    public class Endpoint
+    {
+        [XmlAttribute]
+        public string Url { get; set; }
+        [XmlAttribute]
+        public string Type { get; set; } = "Default";
+    }
+
+    public class CmdEntry
+    {
+        [XmlAttribute]
+        public string CmdName { get; set; }
+        [XmlAttribute]
+        public string Owner { get; set; }
+        public string Process { get; set; }
+        public string CmdArgs { get; set; }
+
+        public string Description { get; set; }
+        [XmlAttribute] public bool Enabled { get; set; } = true;
+    }
+}
