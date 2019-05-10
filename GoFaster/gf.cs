@@ -30,7 +30,8 @@ namespace Slin.GoFaster
         static readonly Regex _regP4Workspace = new Regex(@"^c:\\P4", RegexOptions.Compiled | RegexOptions.IgnoreCase);
         static readonly Regex _regP4Config = new Regex(@"REM\s+--START\s*P4(.+)REM --END P4 CONFIG--", RegexOptions.Compiled | RegexOptions.Singleline);
 
-        static string _workingBranch = "current";
+        static string _workingBranch;
+        static string DefaultWorkingBranch;
         static string _defaultTeams = string.Empty; //or "all"
         static List<Project> AllProjects = new List<Project>();
         static List<Project> CurrentProjects = new List<Project>();
@@ -128,7 +129,7 @@ namespace Slin.GoFaster
             Console.WriteLine($"Got {CurrentProjects.Count} projects loaded from projects.xml; p4 sync cmd got maintained in sync.cmd.");
 
             if (_enableLog) foreach (var kvp in options) Console.WriteLine($"OPTION: {kvp.Key} : {kvp.Value}");
-            _workingBranch = options.ContainsKey("branch") ? options["branch"] : "current";
+            _workingBranch = options.ContainsKey("branch") ? options["branch"] : _workingBranch;
             Console.WriteLine($"\r\nFollowing are the projects for working branch '{_workingBranch}':");
 
             SetBranch(AllProjects, _workingBranch);
@@ -228,6 +229,7 @@ namespace Slin.GoFaster
         {
             _p4Workspace = ConfigurationManager.AppSettings["P4Workspace"]?.TrimEnd('\\').Replace('/', '\\');
             _wcfTestClientLocation = ConfigurationManager.AppSettings["WcfTestClientLocation"]?.ToString();
+            DefaultWorkingBranch = ConfigurationManager.AppSettings["DefaultWorkingBranch"]?.ToString() ?? "current";
 
             if (Assembly.GetExecutingAssembly() != null)
             {
@@ -437,7 +439,7 @@ namespace Slin.GoFaster
         {
             var branchName = string.Empty;
             parameters.TryGetValue("branch", out branchName);
-            branchName = branchName ?? _workingBranch ?? "current";
+            branchName = branchName ?? _workingBranch;
             if (_enableLog) Console.WriteLine($"command: {command} proj: {projNoOrName} branch: {branchName} , {string.Join(",", parameters.Select(kv => $"{kv.Key}:{kv.Value}"))}");
             parameters = parameters ?? new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
             projNoOrName = projNoOrName ?? string.Empty;
