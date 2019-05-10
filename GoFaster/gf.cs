@@ -18,8 +18,10 @@ namespace Slin.GoFaster
         /**
          * 0.2.0.0  initial version; TODO process `CmdEntry`
          * 0.3.0.0  rename P4Cmd to GoFaster and use gf as assembly name
+         * 0.4.0.0  process CmdEntry, introduce uuid, support > cmd {project}; TODO to support lscmd
          * */
-        const string AppVersion = "0.3.0.0";
+        const string AppName = "GoFaster";
+        const string AppVersion = "0.4.0.0";
         private static string CmdRegularExpressionString;
         static Regex RegBranch;
         static readonly Regex RegArgs = new Regex(@"/?\b(?<optkey>[a-zA-Z]+)[\:|=](?<optval>[^""\s]+|""(?:[^""]+""))|-(?<optval>[a-zA-Z]+)\s+(?<optval>[^""\s]+|""(?:[^""]+)"")|--(?<optflag>[a-zA-Z]+)");
@@ -35,8 +37,9 @@ namespace Slin.GoFaster
         static string _defaultTeams = string.Empty; //or "all"
         static List<Project> AllProjects = new List<Project>();
         static List<Project> CurrentProjects = new List<Project>();
+        static List<CmdEntry> CmdEntries = new List<CmdEntry>();
 
-        static readonly string AllCommandNames = ",list,ls,cmd,mmc,ping,eventviewer,notepad,notepad++,desc,describe,wiki,p4v,inetmgr,ssms,sql,postman,pm,iisreset,help,?,set,db,hosts,folder,fld,code,wcf,";
+        static readonly string AllCommandNamesNoNeedProject = ",list,ls,lscmd,cmd,mmc,ping,eventviewer,notepad,notepad++,desc,describe,wiki,p4v,inetmgr,ssms,sql,postman,pm,iisreset,help,?,set,db,hosts,folder,fld,code,wcf,uuid,guid,";
         const string FolderHost = @"C:\Windows\System32\drivers\etc\";
         internal static readonly Dictionary<string, string> KeyMapping = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         internal static readonly Dictionary<string, string> ValueMapping = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
@@ -49,14 +52,17 @@ namespace Slin.GoFaster
         const int ColumnSize = 36;  // Console.WindowSize / _columnSize to get the column count
         const string ProfileFileName = "profile.xml";
         private const int Indent = 2;
+        static char[] _commaSpaceSeparater = new[] { ',', ' ' };
+        static char[] _spaceSeparater = new[] { ' ' };
 
         static Program()
         {
-            CmdRegularExpressionString = $@"^\s*(?<command>sync|open|bld|build|start|folder|fld|code|url|wiki|desc|describe)(?:\s+(?<projNoOrName>[\._\w]+))?"
+            CmdRegularExpressionString = $@"^\s*(?<command>sync|open|bld|build|start|folder|fld|code|url|wiki|cmd|desc|describe)(?:\s+(?<projNoOrName>[\._\w]+))?"
             + $@"|^\s*(?<command>(?:list|ls|set))\s*"  //e.g. list /team:team8 /name:coreapi /category:ecash
             + $@"|^\s*(?<command>notepad|notepad\+\+|p4v|inetmgr|ssms|sql|iisreset|vs\d{4}|wcf|postman|pm)\s*"
             + @"|^\s*(?<command>help|\?)\s*$"
-            + @"|^\s*(?<command>cmd|mmc|eventviewer)\s*$"
+            + @"|^\s*(?<command>mmc|eventviewer)\s*$"
+            + @"|^\s*(?<command>uuid|guid)"
             + @"|^\s*(?<command>ping)\s+(?<action>.+)\s*$"  //action actually is IP or host name here
             + $@"|^\s*(?<command>hosts)(?:\s+(?<action>open|set|find|restore|fld|folder))?\s*"  //host, env, for:
             + @"|^\s*(?<command>db)(?:\s+(?<dbName>[-\w]+))?";  //set branch=int;
@@ -78,6 +84,7 @@ namespace Slin.GoFaster
                 {"url", "wiki; wiki 31; wiki PinService; wiki pinser"},
                 {"fld,folder", "fld|folder [projectNameOrNo]"},
                 {"bld,bld", $"bld|build {tmp}"},
+                {"uuid,guid", $"uuid|guid"},
                 {"cls,clear,q", $"clear|cls console"},
             };
 
@@ -122,10 +129,9 @@ namespace Slin.GoFaster
             AllProjects = allProjects.Where(p => p.Enabled).ToList();
             CurrentProjects = AllProjects.OrderBy(p => p.Name).ToList();
 
-            if (allProjects.Count == 0 || AllProjects.Count == 0)
-            {
-                WriteLineIdt("invalid projects.xml file or no projects in it.");
-            }
+            CmdEntries = profile.CmdEntries ?? new List<CmdEntry>();
+
+            WriteLineIdtIf(allProjects.Count == 0 || AllProjects.Count == 0, "invalid projects.xml file or no enabled projects in it.");
             Console.WriteLine($"Got {CurrentProjects.Count} projects loaded from projects.xml; p4 sync cmd got maintained in sync.cmd.");
 
             if (_enableLog) foreach (var kvp in options) Console.WriteLine($"OPTION: {kvp.Key} : {kvp.Value}");
@@ -134,12 +140,7 @@ namespace Slin.GoFaster
 
             SetBranch(AllProjects, _workingBranch);
 
-            {
-                var owners = options.ContainsKey("team") ? options["team"] : _defaultTeams;
-                var category = options.ContainsKey("category") ? options["category"] : null;
-                var name = options.ContainsKey("name") ? options["name"] : null;
-                ListProjects(owners.Split(new[] { ',', ' ' }, StringSplitOptions.RemoveEmptyEntries), category, name);
-            }
+            ListProjects(options);
 
             Console.WriteLine();
         STEP01:
@@ -175,7 +176,7 @@ namespace Slin.GoFaster
                 {
                     CurrentCommand = inputCmd;
 
-                    var command = matchAction.Groups["command"].Value;
+                    var command = matchAction.Groups["command"].Value.ToLower();
                     var action = matchAction.Groups["action"].Value;
                     var projNoOrName = matchAction.Groups["projNoOrName"].Value;
 
@@ -184,7 +185,7 @@ namespace Slin.GoFaster
 
                     var matchedCmd = matchAction.ToString();
                     var optionsString = inputCmd.Substring(matchedCmd.Length);
-                    var parameters = ResolveOptions(command, action, optionsString.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries));
+                    var parameters = ResolveOptions(command, action, optionsString.Split(_spaceSeparater, StringSplitOptions.RemoveEmptyEntries));
 
                     if (_enableLog)
                         Console.WriteLine($"STEP02:: command: {command}, action: {action}, projNoOrName: {projNoOrName}, default teams: {_defaultTeams} \r\nparameters: {string.Join(", ", parameters.Select(o => $"{o.Key}:{o.Value}").ToList())}");
@@ -199,9 +200,15 @@ namespace Slin.GoFaster
                     goto STEP02;
                 }
 
-                if (!string.IsNullOrWhiteSpace(inputCmd))
+
+                if (!string.IsNullOrWhiteSpace(inputCmd) && inputCmd.StartsWith(":") && CmdEntries != null)
                 {
-                    var arr = inputCmd.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+                    ProcessCmdEntry(inputCmd, true);
+                    goto STEP02;
+                }
+                else if (!string.IsNullOrWhiteSpace(inputCmd)) // cmd starts with ':' means custom entry
+                {
+                    var arr = inputCmd.Split(_spaceSeparater, StringSplitOptions.RemoveEmptyEntries);
                     var firstSegment = arr[0];
                     var secondSeg = (arr.Length > 1) ? arr[1].ToLower() : "";
                     if (CmdSamples.ContainsKey(firstSegment))
@@ -215,14 +222,60 @@ namespace Slin.GoFaster
                         goto STEP02;
                     }
 
-                    var parameters = ResolveOptions("open", null, inputCmd.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries));
-                    GoAction("open", null, inputCmd.Trim(), CurrentProjects, parameters);
+                    var parameters = ResolveOptions("open", null, inputCmd.Split(_spaceSeparater, StringSplitOptions.RemoveEmptyEntries));
+                    if (GoAction("open", null, inputCmd.Trim(), CurrentProjects, parameters) == null)
+                    {
+                        ProcessCmdEntry(inputCmd, false);
+                    }
                     goto STEP02;
                 }
 
                 WriteLineIdt("invalid input, try again");
                 goto STEP02;
             }
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="inputCmd"></param>
+        /// <param name="showFailMsg"></param>
+        /// <returns>means cmd found in profile</returns>
+        static bool ProcessCmdEntry(string inputCmd, bool showFailMsg = true)
+        {
+            if (inputCmd == null) return false;
+
+            inputCmd = inputCmd.TrimStart(':');
+
+            var arr = inputCmd.Split(_spaceSeparater, 2, StringSplitOptions.RemoveEmptyEntries);
+            var isCmdFound = false;
+            if (arr.Length > 0)
+            {
+                var cmd = arr[0].ToLower();
+                var args = arr.Length > 1 ? arr[1] : (string)null;
+                var found = CmdEntries.FirstOrDefault(entry => entry != null && entry.CmdName != null
+                && entry.CmdName.Split(new[] { ',' }).Contains(cmd));
+
+                if (found != null)
+                {
+                    isCmdFound = true;
+                    try
+                    {
+                        args = args ?? found.CmdArgs;
+                        WriteLineIdt($"process cmd: {found.Process} {args}");
+                        Process.Start(found.Process, args ?? found.CmdArgs);
+                    }
+                    catch (Exception ex)
+                    {
+                        WriteLineIdtIf(showFailMsg, $"error occurred when process: {inputCmd}: {ex.Message}");
+                    }
+                }
+                else if (showFailMsg)
+                {
+                    Console.WriteLine($"command '{cmd}' not found in profile file. please check it.");
+                }
+            }
+            return isCmdFound;
         }
 
         private static void InitConfigurations()
@@ -325,8 +378,13 @@ namespace Slin.GoFaster
             #endregion
         }
 
-        private static void ListProjects(string[] owners = null, string category = null, string name = null)
+        private static void ListProjects(IDictionary<string, string> parameters)
         {
+            var owners = (parameters.ContainsKey("team") ? parameters["team"] : _defaultTeams)
+                .Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
+            var category = parameters.ContainsKey("category") ? parameters["category"] : null;
+            var name = parameters.ContainsKey("name") ? parameters["name"] : null;
+
             owners = owners ?? new string[0];
             CurrentProjects = AllProjects.Where(p => owners.Length == 0
                || owners.Contains("all", StringComparer.OrdinalIgnoreCase)
@@ -334,10 +392,9 @@ namespace Slin.GoFaster
                 || owners.Any(owner => (owner.StartsWith("\"")) && owner.Equals(p.Owner.Trim(new[] { '"' }), StringComparison.OrdinalIgnoreCase))
                 || owners.Any(owner => p.Owner.IndexOf(owner, StringComparison.OrdinalIgnoreCase) >= 0)).ToList();
 
-            var splitter = new[] { ' ', ',' };
             CurrentProjects = CurrentProjects.Where(p => string.IsNullOrEmpty(category)
-                || (!category.StartsWith("\"")) && p.Category.Split(splitter, StringSplitOptions.RemoveEmptyEntries).Any(c => category.Equals(c, StringComparison.OrdinalIgnoreCase))
-                || p.Category.Split(splitter, StringSplitOptions.RemoveEmptyEntries).Any(c => c.IndexOf(category, StringComparison.OrdinalIgnoreCase) >= 0)).ToList();
+                || (!category.StartsWith("\"")) && p.Category.Split(_commaSpaceSeparater, StringSplitOptions.RemoveEmptyEntries).Any(c => category.Equals(c, StringComparison.OrdinalIgnoreCase))
+                || p.Category.Split(_commaSpaceSeparater, StringSplitOptions.RemoveEmptyEntries).Any(c => c.IndexOf(category, StringComparison.OrdinalIgnoreCase) >= 0)).ToList();
 
             var list = CurrentProjects;
             if (!string.IsNullOrWhiteSpace(name))
@@ -382,24 +439,20 @@ namespace Slin.GoFaster
         private static void SetBranch(List<Project> projects, string branchNumber)
         {
             var title = Console.Title;
-            var idx = title.IndexOf(" - GoFaster", StringComparison.OrdinalIgnoreCase);
+            var idx = title.IndexOf($" - {AppName}", StringComparison.OrdinalIgnoreCase);
             if (idx >= 0)
             {
-                Console.Title = $"{title.Substring(0, idx)} - GoFaster on branch {branchNumber} (V{AppVersion})";
+                Console.Title = $"{title.Substring(0, idx)} - {AppName} on branch {branchNumber} (V{AppVersion})";
             }
             else
             {
-                Console.Title = $"{title} - GoFaster on branch {branchNumber} (V{AppVersion})";
+                Console.Title = $"{title} - {AppName} on branch {branchNumber} (V{AppVersion})";
             }
 
             for (int i = 0; i < projects.Count; i++)
             {
-                //if(projects[i].Path == "") continue;
                 projects[i].Path = RegBranch.Replace(projects[i].Path, "\\" + branchNumber + "\\");
-                projects[i].Path = projects[i].Path.Replace("\\59\\", "\\" + branchNumber + "\\").Replace("{Branch}", branchNumber.ToString());
-
                 projects[i].Entry = RegBranch.Replace(projects[i].Entry, "\\" + branchNumber + "\\");
-                projects[i].Entry = projects[i].Entry.Replace("\\59\\", "\\" + branchNumber + "\\").Replace("{Branch}", branchNumber.ToString());
             }
         }
 
@@ -436,10 +489,11 @@ namespace Slin.GoFaster
         }
 
         #region --Action--
-        static void GoAction(string command, string action, string projNoOrName,
+        static Project GoAction(string command, string action, string projNoOrName,
             List<Project> projects,
-            Dictionary<string, string> parameters = null)
+            Dictionary<string, string> parameters)
         {
+            command = command.ToLower();
             var branchName = string.Empty;
             parameters.TryGetValue("branch", out branchName);
             branchName = branchName ?? _workingBranch;
@@ -450,28 +504,21 @@ namespace Slin.GoFaster
 
             if (!string.IsNullOrEmpty(projNoOrName))
             {
-                if (projNoOrName.All(c => Char.IsNumber(c)))
+                if (projNoOrName.All(c => char.IsNumber(c)))
                 {
                     project = AllProjects.FirstOrDefault(o => o.Index == Convert.ToInt32(projNoOrName)); //GetProj(Convert.ToInt32(projNoOrName));
                 }
                 else
                 {
                     project = GetProj(projNoOrName);
-
-                    //if (projNoOrName.Length <= 3)
-                    //{
-                    //    WriteLineIdt("to match project better, please use number or at least 3 characters for project");
-                    //    return;
-                    //}
                 }
             }
 
             if (project == null
-                && AllCommandNames.IndexOf("," + command + ",", StringComparison.OrdinalIgnoreCase) == -1
-                && false == ("sync" == command.ToLower() && "all" == projNoOrName.ToLower()))
+                && AllCommandNamesNoNeedProject.IndexOf($",{command},", StringComparison.OrdinalIgnoreCase) == -1)
             {
                 WriteLineIdt($"cannot find the project or command '{projNoOrName}', it needs project name or number");
-                return;
+                return project;
             }
 
             try
@@ -491,12 +538,12 @@ namespace Slin.GoFaster
                 }
                 else if (command.Equals("cmd", StringComparison.OrdinalIgnoreCase))
                 {
-                    Process.Start("cmd.exe");
+                    ProcessCmdCmd(project, parameters);
                 }
                 else if (command.Equals("wiki", StringComparison.OrdinalIgnoreCase))
                 {
                     if (project != null) OpenWiki(project);
-                    else Process.Start("https://github.com/sw0/GoFaster");
+                    else Process.Start("https://github.com/sw0/GoFaster/blob/master/README.md");
                 }
                 else if (command.Equals("p4v", StringComparison.OrdinalIgnoreCase))
                 {
@@ -557,12 +604,9 @@ namespace Slin.GoFaster
                 {
                     StartPostman();
                 }
-                else if (command.Equals("list", StringComparison.OrdinalIgnoreCase) || command.Equals("ls", StringComparison.OrdinalIgnoreCase))
+                else if (",list,ls,".Contains(string.Concat(",", command, ",")))
                 {
-                    var team = parameters.ContainsKey("team") ? parameters["team"] : _defaultTeams;
-                    var category = parameters.ContainsKey("category") ? parameters["category"] : "";
-                    var name = parameters.ContainsKey("name") ? parameters["name"] : "";
-                    ListProjects(team.Split(new[] { ',', ' ' }, StringSplitOptions.RemoveEmptyEntries), category, name);
+                    ListProjects(parameters);
                 }
                 else if (command.Equals("set", StringComparison.OrdinalIgnoreCase))
                 {
@@ -592,16 +636,19 @@ namespace Slin.GoFaster
                 {
                     ProcessUrlCmd(project, parameters);
                 }
-                else if (command.Equals("desc", StringComparison.OrdinalIgnoreCase) || command.Equals("describe", StringComparison.OrdinalIgnoreCase))
+                else if ((new[] { "uuid", "guid" }).Contains(command))
+                {
+                    var guid = Guid.NewGuid().ToString();
+                    Clipboard.SetText(guid); WriteLineIdt($"guid copied to clipboard: {guid}");
+                }
+                else if ((new[] { "desc", "describe" }).Contains(command))
                 {
                     if (project == null)
                     {
-                        //show all the projects
                         projects.ForEach(p => Console.WriteLine(p.ToDescriptionString(branchName)));
                     }
                     else
                     {
-                        //show the project
                         Console.WriteLine(project.ToDescriptionString(branchName));
                     }
                 }
@@ -617,6 +664,8 @@ namespace Slin.GoFaster
                 WriteLineIdt("Reminder: please check whether you run this as administrator mode");
                 Console.ResetColor();
             }
+
+            return project;
         }
 
         static void ProcessHostsCmd(string action, Dictionary<string, string> parameters)
@@ -791,6 +840,18 @@ namespace Slin.GoFaster
             }
         }
 
+        static void ProcessCmdCmd(Project project, Dictionary<string, string> parameters)
+        {
+            if (!string.IsNullOrEmpty(project?.Path))
+            {
+                var wd = Path.GetDirectoryName(project.Path);
+                var processStartInfo = new ProcessStartInfo();
+                processStartInfo.WorkingDirectory = wd;
+                processStartInfo.FileName = "cmd.exe";
+                Process proc = Process.Start(processStartInfo);
+            }
+            else Process.Start("cmd.exe");
+        }
         private static string MergeHostEntries(List<string> repositories, string env, string defaultEnvToMerge)
         {
             var sb = new StringBuilder();
@@ -907,7 +968,7 @@ namespace Slin.GoFaster
             Console.ForegroundColor = ConsoleColor.DarkYellow;
             foreach (var row in CmdSamples)
             {
-                var keys = row.Key.Split(new[] { ' ', ',' }, StringSplitOptions.RemoveEmptyEntries);
+                var keys = row.Key.Split(_commaSpaceSeparater, StringSplitOptions.RemoveEmptyEntries);
                 keys.ToList().ForEach(key => WriteLineIdt($"{key}\t{row.Value}"));
             }
             Console.ForegroundColor = old;
@@ -1229,7 +1290,7 @@ namespace Slin.GoFaster
                 var kvp = row.Split(new[] { ':' }, StringSplitOptions.RemoveEmptyEntries);
                 if (kvp.Length == 2 && kvp[0].Length > 0 && kvp[1].Length > 0)
                 {
-                    var keys = kvp[0].ToLowerInvariant().Split(new[] { ' ', ',' }, StringSplitOptions.RemoveEmptyEntries);
+                    var keys = kvp[0].ToLowerInvariant().Split(_commaSpaceSeparater, StringSplitOptions.RemoveEmptyEntries);
                     keys.ToList().ForEach(key =>
                     {
                         if (!KeyMapping.ContainsKey(key)) KeyMapping[key] = kvp[1];
@@ -1310,11 +1371,19 @@ namespace Slin.GoFaster
         {
             Console.WriteLine(msg);
         }
+        static void WriteLineIf(bool condition, string msg = null)
+        {
+            if (condition) Console.WriteLine(msg);
+        }
         static void WriteIdt(string msg)
         {
             Console.Write(new string(' ', Indent) + msg);
         }
 
+        static void WriteLineIdtIf(bool condition, string msg, params object[] args)
+        {
+            if (condition) Console.WriteLine(new string(' ', Indent) + msg, args);
+        }
         static void WriteLineIdt(string msg, params object[] args)
         {
             Console.WriteLine(new string(' ', Indent) + msg, args);
