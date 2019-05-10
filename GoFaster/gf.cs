@@ -48,6 +48,8 @@ namespace Slin.GoFaster
         private static string CurrentCommand = "";
         const int ColumnSize = 36;  // Console.WindowSize / _columnSize to get the column count
         const string ProfileFileName = ".\\p4cmd_profile.xml";
+        const string SyncCfgFileName = ".\\sync_cfg.cmd";
+        const string SyncCmdFileName = ".\\sync_cmd.cmd";
         private const int Indent = 2;
 
         static Program()
@@ -108,7 +110,7 @@ namespace Slin.GoFaster
 
             if (_isFirstRun || options.ContainsKey("init"))
             {
-                SetupSampleProfile(options);
+                InitProfileAndSyncCmd(options);
 
                 if (_isFirstRun)
                 {
@@ -236,11 +238,11 @@ namespace Slin.GoFaster
                 Environment.CurrentDirectory = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
             }
 
-            #region --sync_init.cmd--
+            #region --sync_cfg.cmd--
             var nl = Environment.NewLine;
             var initSyncInitContent = $"@echo off{nl}{nl}REM --START P4 CONFIG--{nl}"
                 + $"#PARAMETERS WILL BE SET BASE ON CONFIGURATION HERE{nl}"
-                + $"REM --END P4 CONFIG--{nl}echo P4Port:   %P4Port%{nl}echo P4USER:   %P4USER%{nl}echo P4Client: %P4Client%{nl}";
+                + $"REM --END P4 CONFIG--{nl}{nl}echo P4Port:   %P4Port%{nl}echo P4USER:   %P4USER%{nl}echo P4Client: %P4Client%{nl}";
 
             var p4Port = ConfigurationManager.AppSettings["P4Port"];
             var p4Client = ConfigurationManager.AppSettings["P4Client"];
@@ -249,9 +251,9 @@ namespace Slin.GoFaster
             //_enableLog maybe set by command argument already
             if (!_enableLog) bool.TryParse(ConfigurationManager.AppSettings["EnableLog"], out _enableLog);
 
-            //update sync_init.cmd base on user's environment
+            //update sync_cfg.cmd base on user's environment
             var realConfig = $@"REM --START P4 CONFIG--{nl}set P4Port={p4Port}{nl}set P4Client={p4Client}{nl}SET P4USER={p4User}{nl}SET P4WorkspaceMappedPath={_p4Workspace}{nl}REM --END P4 CONFIG--";
-            var fileSyncInit = "sync_init.cmd";
+            var fileSyncInit = SyncCfgFileName;
 
             if (File.Exists(fileSyncInit))
             {
@@ -268,7 +270,7 @@ namespace Slin.GoFaster
                 File.WriteAllText(fileSyncInit, content);
                 _isFirstRun = true;
             }
-            //END sync_init.cmd
+            //END sync_cfg.cmd
 
             #endregion
 
@@ -1314,7 +1316,7 @@ namespace Slin.GoFaster
             Console.WriteLine(new string(' ', Indent) + msg, args);
         }
 
-        static void SetupSampleProfile(IDictionary<string, string> options)
+        static void InitProfileAndSyncCmd(IDictionary<string, string> options)
         {
             var profile = new P4CmdProfile()
             {

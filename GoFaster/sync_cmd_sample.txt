@@ -1,0 +1,41 @@
+@echo off
+ 
+IF NOT "%2"=="" SET Branch=%2%
+IF "%Branch%"=="" SET Branch=current
+SET Name=%1%
+SET force=%3%
+ 
+echo -------------------------
+echo Project Name: %1%
+echo Branch Name: %2%
+echo Force: %force%
+echo.
+echo # sync.cmd %Name% %Branch% %3%
+echo.
+echo -------------------------
+ 
+call sync_config.cmd
+ 
+REM p4 sync %force% //DotNet/%Branch%/Bin/...#head
+              
+if /I "%Name%" == "Slin.MaskEngine" (
+ 
+    p4 sync %force% //REPO1/%Branch%/Shared/NuGet/Slin.MaskEngine/...#head
+ 
+)else if not %Name:Disbur=% == %Name% (
+    REM echo %Name:Disbur=%
+              
+    p4 sync %force% //REPO1/%Branch%/Source/Disbursement/...#head
+ 
+) else if /I "%Name%" == "RegexTool" (
+    p4 sync %force% //REPO2/%Branch%/RegexTool/...#head
+	::    p4 edit -c default %P4WorkspaceMappedPath%\REPO1\%Branch%\SoaV2\ReadMe.txt
+	::    echo  got checked out to default changeset on purpuse, for ....
+ 
+) else (
+    echo ---Project Name %Name% is invalid! ---
+    pause
+)
+ 
+p4 sync //REPO1/Configs/HOSTS/...#head
+p4 sync //REPO2/Utils/hosts/...#head
