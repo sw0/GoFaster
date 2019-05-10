@@ -21,7 +21,7 @@ namespace Slin.GoFaster
          * */
         const string AppVersion = "0.3.0.0";
         private static string CmdRegularExpressionString;
-        static readonly Regex RegBranch = new Regex(@"\\(current|offcycle|integration|production|trunk|release)\\");
+        static Regex RegBranch;
         static readonly Regex RegArgs = new Regex(@"/?\b(?<optkey>[a-zA-Z]+)[\:|=](?<optval>[^""\s]+|""(?:[^""]+""))|-(?<optval>[a-zA-Z]+)\s+(?<optval>[^""\s]+|""(?:[^""]+)"")|--(?<optflag>[a-zA-Z]+)");
         static string _p4Workspace = @"c:\p4";  // my personal default perforce workspace
         static string _wcfTestClientLocation = @"C:\Program Files (x86)\Microsoft Visual Studio 14.0\Common7\IDE\WcfTestClient.exe";
@@ -45,9 +45,9 @@ namespace Slin.GoFaster
 
         static bool _isFirstRun = false;
         static bool _enableLog = false;
-        private static string CurrentCommand = "";
+        private static string CurrentCommand;
         const int ColumnSize = 36;  // Console.WindowSize / _columnSize to get the column count
-        const string ProfileFileName = ".\\p4cmd_profile.xml";
+        const string ProfileFileName = "profile.xml";
         private const int Indent = 2;
 
         static Program()
@@ -64,7 +64,7 @@ namespace Slin.GoFaster
             _regAction = new Regex(CmdRegularExpressionString,
                 RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
-            const string tmp = "<projectNameOrNo> b[ranch]:int[egration]|off[cycle]|current|Trunk|Release --force";
+            const string tmp = "<projectNameOrNo> b[ranch]:<branch abbr or name> --force";
             CmdSamples = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
             {
                 {"misc", "notepad[++], wcf, sql, ssms, inetmgr, p4v, postman|pm, mmc, db"},
@@ -72,7 +72,7 @@ namespace Slin.GoFaster
                 {"OPEN", $"open|code {tmp}"},
                 {"CODE", $"open|code {tmp}"},
                 {"desc", $"desc {tmp}"},
-                {"HOSTS", "hosts; hosts open|folder|fld|restore;hosts set e[nv]|b[branch]:QA4 [for:repo2];hosts set for:repo1,repo2,move e:dev merge:di;hosts restore; hosts find h[ost]:server1v3|IP e:qa for=repo1"},
+                {"HOSTS", "hosts; hosts open|folder|fld|restore;hosts set e[nv]|b[branch]:QA4 [for:repo2];\r\n\thosts set for:repo1,repo2,move e:dev merge:di;\r\n\thosts restore; hosts find h[ost]:server1v3|IP e:qa for=repo1"},
                 {"ls,list", "ls|list team:team8,alpha name:coreapi category:ecash"},
                 {"wiki", "wiki; wiki 31; wiki PinService; wiki pinser"},
                 {"url", "wiki; wiki 31; wiki PinService; wiki pinser"},
@@ -101,7 +101,6 @@ namespace Slin.GoFaster
 
             InitConfigurations();
 
-
             Console.WriteLine("Please run this as administrator(some projects needs it to setup IIS website/application. CTRL+Shift+Enter)");
             //Console.WriteLine("Files you probably need to maintain are: projects.xml and sync.cmd.");
             if (_enableLog) Console.WriteLine($"DEBUG: {ConfigurationManager.AppSettings["P4Client"]}");
@@ -112,12 +111,13 @@ namespace Slin.GoFaster
 
                 if (_isFirstRun)
                 {
-                    Help(); WriteLineIdt("Press any key to list all the projects.");
+                    WriteLine();
+                    Help(); WriteLine("\r\nPress any key to list all the projects.");
                     Console.ReadKey();
                 }
             }
 
-            var profile = GetP4CmdProfile();
+            var profile = GetProfile();
             var allProjects = profile.Projects;
             AllProjects = allProjects.Where(p => p.Enabled).ToList();
             CurrentProjects = AllProjects.OrderBy(p => p.Name).ToList();
@@ -129,7 +129,7 @@ namespace Slin.GoFaster
             Console.WriteLine($"Got {CurrentProjects.Count} projects loaded from projects.xml; p4 sync cmd got maintained in sync.cmd.");
 
             if (_enableLog) foreach (var kvp in options) Console.WriteLine($"OPTION: {kvp.Key} : {kvp.Value}");
-            _workingBranch = options.ContainsKey("branch") ? options["branch"] : _workingBranch;
+            _workingBranch = options.ContainsKey("branch") ? options["branch"] : DefaultWorkingBranch;
             Console.WriteLine($"\r\nFollowing are the projects for working branch '{_workingBranch}':");
 
             SetBranch(AllProjects, _workingBranch);
@@ -230,7 +230,10 @@ namespace Slin.GoFaster
             _p4Workspace = ConfigurationManager.AppSettings["P4Workspace"]?.TrimEnd('\\').Replace('/', '\\');
             _wcfTestClientLocation = ConfigurationManager.AppSettings["WcfTestClientLocation"]?.ToString();
             DefaultWorkingBranch = ConfigurationManager.AppSettings["DefaultWorkingBranch"]?.ToString() ?? "current";
+            var branchRegexPattern = ConfigurationManager.AppSettings["BranchRegexPattern"]?.ToString();
+            if (string.IsNullOrWhiteSpace(branchRegexPattern)) throw new Exception("appSetting for BranchRegexPattern must be set!");
 
+            RegBranch = new Regex(branchRegexPattern);
             if (Assembly.GetExecutingAssembly() != null)
             {
                 Environment.CurrentDirectory = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
@@ -451,14 +454,15 @@ namespace Slin.GoFaster
                 {
                     project = AllProjects.FirstOrDefault(o => o.Index == Convert.ToInt32(projNoOrName)); //GetProj(Convert.ToInt32(projNoOrName));
                 }
-                else if (projNoOrName.Length <= 3)
-                {
-                    WriteLineIdt("to match project better, please use number or at least 3 characters for project");
-                    return;
-                }
                 else
                 {
                     project = GetProj(projNoOrName);
+
+                    //if (projNoOrName.Length <= 3)
+                    //{
+                    //    WriteLineIdt("to match project better, please use number or at least 3 characters for project");
+                    //    return;
+                    //}
                 }
             }
 
@@ -492,7 +496,7 @@ namespace Slin.GoFaster
                 else if (command.Equals("wiki", StringComparison.OrdinalIgnoreCase))
                 {
                     if (project != null) OpenWiki(project);
-                    else Process.Start("https://github.com/sw0/p4cmd");
+                    else Process.Start("https://github.com/sw0/GoFaster");
                 }
                 else if (command.Equals("p4v", StringComparison.OrdinalIgnoreCase))
                 {
@@ -894,13 +898,17 @@ namespace Slin.GoFaster
                 _enableLog = debug != "false" && debug != "0";
             }
         }
-        private static void Help()
+        private static void Help(string title = "GF USAGE INFORMATION:")
         {
+            if (!string.IsNullOrEmpty(title))
+                Console.WriteLine(title);
+
             var old = Console.ForegroundColor;
             Console.ForegroundColor = ConsoleColor.DarkYellow;
             foreach (var row in CmdSamples)
             {
-                WriteLineIdt($"{row.Key}\t{row.Value}");
+                var keys = row.Key.Split(new[] { ' ', ',' }, StringSplitOptions.RemoveEmptyEntries);
+                keys.ToList().ForEach(key => WriteLineIdt($"{key}\t{row.Value}"));
             }
             Console.ForegroundColor = old;
         }
@@ -1010,11 +1018,9 @@ namespace Slin.GoFaster
         {
             if (!string.IsNullOrWhiteSpace(proj.Url))
             {
-                Uri u = null;
-
                 try
                 {
-                    u = new Uri(proj.Url);
+                    Uri u = new Uri(proj.Url);
 
                     if (!string.IsNullOrEmpty(host))
                     {
@@ -1028,14 +1034,14 @@ namespace Slin.GoFaster
                         }
                     }
 
-                    WriteLineIdt($"Starting {u}");
+                    WriteLineIdt($"starting {u}");
                     Process.Start(u.AbsoluteUri);
                     return;
                 }
                 catch { }
             }
 
-            WriteLineIdt($"The solution/project Url was not set for Project '{proj.Name}'");
+            WriteLineIdt($"the solution/project Url was not set for Project '{proj.Name}'");
         }
 
         static void StartPostman()
@@ -1123,11 +1129,11 @@ namespace Slin.GoFaster
         }
         #endregion
 
-        static P4CmdProfile GetP4CmdProfile()
+        static Profile GetProfile()
         {
             try
             {
-                var profile = Deserialize<P4CmdProfile>(ProfileFileName);
+                var profile = Deserialize<Profile>(ProfileFileName);
                 profile?.Projects?.ForEach((p) =>
                 {
                     if (p.Path?.Length > 0 && !p.Path.StartsWith(_p4Workspace, StringComparison.OrdinalIgnoreCase))
@@ -1300,7 +1306,7 @@ namespace Slin.GoFaster
             return dic;
         }
 
-        static void WriteLine(string msg)
+        static void WriteLine(string msg = null)
         {
             Console.WriteLine(msg);
         }
@@ -1316,15 +1322,15 @@ namespace Slin.GoFaster
 
         static void SetupSampleProfile(IDictionary<string, string> options)
         {
-            var profile = new P4CmdProfile()
+            var profile = new Profile()
             {
                 CmdEntries = new List<CmdEntry> {
                     new CmdEntry
                     {
                         Owner="all",
                         Enabled = true,
-                        CmdName = "reg",
-                        Process = "http://www.tainisoft.com/tools/p4cmd",
+                        CmdName = "gf",
+                        Process = "http://www.tainisoft.com/tools/GoFaster",
                     }
                 },
                 Projects = new List<Project>
@@ -1334,7 +1340,7 @@ namespace Slin.GoFaster
                         Enabled=true,
                         Owner="alpha",
                         Name ="Slin.MaskEngine",
-                        Path = @"c:\p4\slin\Slin.MaskEngine\Slin.MaskEngine.sln",
+                        Path = @"c:\p4\REPO1\current\Slin.MaskEngine\Slin.MaskEngine.sln",
                         Wiki = "https://github.com/sw0/Slin.MaskEngine",
                         Endpoints = new List<Endpoint>
                         {
@@ -1346,7 +1352,7 @@ namespace Slin.GoFaster
                         Enabled=true,
                         Owner="team8",
                         Name ="RegexTool",
-                        Path = @"c:\p4\slin\RegexTool\RegexTool.sln",
+                        Path = @"c:\p4\REPO2\current\RegexTool\RegexTool.sln",
                         Wiki = "https://github.com/sw0/RegexTool"
                     }
                 }
@@ -1354,13 +1360,17 @@ namespace Slin.GoFaster
 
             if (!File.Exists(ProfileFileName) || options.ContainsKey("overwrite"))
             {
+                if (File.Exists(ProfileFileName))
+                {
+                    File.Move(ProfileFileName, ProfileFileName.ToLower().Replace(".xml", $"{DateTime.Now:yyyyMMddHHmmss}.xml"));
+                }
                 SerializeToXml(profile, ProfileFileName);
-                WriteLineIdt("test projects.xml setup!");
+                WriteLineIdt("projects.xml got initialized.");
             }
         }
     }
 
-    public class P4CmdProfile
+    public class Profile
     {
         public List<CmdEntry> CmdEntries { get; set; }
         public List<Project> Projects { get; set; }
