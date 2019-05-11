@@ -517,7 +517,7 @@ namespace Slin.GoFaster
             if (project == null
                 && AllCommandNamesNoNeedProject.IndexOf($",{command},", StringComparison.OrdinalIgnoreCase) == -1)
             {
-                WriteLineIdt($"cannot find the project or command '{projNoOrName}', it needs project name or number");
+                WriteLineIdt($"command '{command}' needs project name or number.{(string.IsNullOrEmpty(projNoOrName) ? "" : $" project with name '{projNoOrName}' not fould.")}");
                 return project;
             }
 
