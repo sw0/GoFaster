@@ -51,7 +51,7 @@
     <None Include="App.config" />
   </ItemGroup>
   <ItemGroup>
-    <Content Include="sync_cmd_sample.txt">
+    <Content Include="sync_sample.txt">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
     <Content Include="manual.xml">

@@ -20,9 +20,10 @@ namespace Slin.GoFaster
          * 0.2.0.0  initial version; TODO process `CmdEntry`
          * 0.3.0.0  rename P4Cmd to GoFaster and use gf as assembly name
          * 0.4.0.0  process CmdEntry, introduce uuid, support > cmd {project}; TODO to support lscmd
+         * 0.5.0.0  improvement and bug fixing
          * */
         const string AppName = "GoFaster";
-        const string AppVersion = "0.4.0.0";
+        const string AppVersion = "0.5.0.0";
         private static string CmdRegularExpressionString;
         static Regex RegBranch;
         static readonly Regex RegArgs = new Regex(@"/?\b(?<optkey>[a-zA-Z]+)[\:|=](?<optval>[^""\s]+|""(?:[^""]+""))|-(?<optval>[a-zA-Z]+)\s+(?<optval>[^""\s]+|""(?:[^""]+)"")|--(?<optflag>[a-zA-Z]+)");
@@ -992,8 +993,6 @@ namespace Slin.GoFaster
                     else
                         WriteLineIdt($"{new string(' ', CmdLength)}{lines[i].Trim()}");
                 }
-
-                //if (string.IsNullOrWhiteSpace(cmd)) WriteLine();
             }
             Console.ForegroundColor = old;
         }
