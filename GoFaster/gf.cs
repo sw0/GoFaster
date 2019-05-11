@@ -417,7 +417,7 @@ namespace Slin.GoFaster
             if (_enableLog)
                 Console.WriteLine($"AllProjects: {AllProjects.Count}, CurrentProjects: {CurrentProjects.Count}, list:  {list.Count}, owner: {String.Join(",", owners)}, category: {category}, name: {name}");
 
-            var groups = list.GroupBy(item => item.Owner);
+            var groups = list.GroupBy(item => item.Owner.ToUpper());
 
             foreach (var g in groups.OrderBy(g => g.Key))
             {
