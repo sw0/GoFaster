@@ -53,6 +53,9 @@ namespace Slin.GoFaster
         private static string CurrentCommand;
         const int ColumnSize = 36;  // Console.WindowSize / _columnSize to get the column count
         const string ProfileFileName = "profile.xml";
+        const string SyncCfgFileName = "sync_cfg.cmd";
+        const string SyncCmdSampleFileName = "sync_sample.txt";
+        const string SyncCmdFileName = "sync.cmd";
         const string ManualFileName = "manual.xml";
         private const int Indent = 2;
         static readonly char[] _commaSpaceSeparater = new[] { ',', ' ' };
@@ -316,22 +319,21 @@ namespace Slin.GoFaster
             if (!_enableLog) bool.TryParse(ConfigurationManager.AppSettings["EnableLog"], out _enableLog);
 
             //update sync_init.cmd base on user's environment
-            var realConfig = $@"REM --START P4 CONFIG--{nl}set P4Port={p4Port}{nl}set P4Client={p4Client}{nl}SET P4USER={p4User}{nl}SET P4WorkspaceMappedPath={_p4Workspace}{nl}REM --END P4 CONFIG--";
-            var fileSyncInit = "sync_init.cmd";
+            var realConfig = $@"REM --START P4 CONFIG--{nl}set P4Port={p4Port}{nl}set P4Client={p4Client}{nl}SET P4USER={p4User}{nl}SET P4WorkspaceMappedPath={_p4Workspace}{nl}REM --END P4 CONFIG--{nl}";
 
-            if (File.Exists(fileSyncInit))
+            if (File.Exists(SyncCfgFileName))
             {
-                var syncInitAttrs = File.GetAttributes(fileSyncInit);
+                var syncInitAttrs = File.GetAttributes(SyncCfgFileName);
                 if ((syncInitAttrs & FileAttributes.ReadOnly) != 0)
                 {
-                    File.SetAttributes(fileSyncInit, syncInitAttrs ^ FileAttributes.ReadOnly);
+                    File.SetAttributes(SyncCfgFileName, syncInitAttrs ^ FileAttributes.ReadOnly);
                 }
-                File.WriteAllText(fileSyncInit, _regP4Config.Replace(File.ReadAllText(fileSyncInit), realConfig));
+                File.WriteAllText(SyncCfgFileName, _regP4Config.Replace(File.ReadAllText(SyncCfgFileName), realConfig));
             }
             else
             {
                 var content = _regP4Config.Replace(initSyncInitContent, realConfig);
-                File.WriteAllText(fileSyncInit, content);
+                File.WriteAllText(SyncCfgFileName, content);
                 _isFirstRun = true;
             }
             //END sync_init.cmd
@@ -1458,6 +1460,11 @@ namespace Slin.GoFaster
                 }
                 SerializeToXml(profile, ProfileFileName);
                 WriteLineIdt("projects.xml got initialized.");
+            }
+
+            if (!File.Exists(SyncCmdFileName))
+            {
+                File.Copy(SyncCmdSampleFileName, SyncCmdFileName, options.ContainsKey("force"));
             }
         }
     }

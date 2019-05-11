@@ -14,7 +14,7 @@ echo # sync.cmd %Name% %Branch% %3%
 echo.
 echo -------------------------
  
-call sync_config.cmd
+call sync_cfg.cmd
  
 REM p4 sync %force% //DotNet/%Branch%/Bin/...#head
               
