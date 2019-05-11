@@ -7,7 +7,7 @@
     <ProjectGuid>{F59A19B9-CE74-4731-8D19-CF0DD9CF5FB8}</ProjectGuid>
     <OutputType>Exe</OutputType>
     <RootNamespace>Slin.GoFaster</RootNamespace>
-    <AssemblyName>GF</AssemblyName>
+    <AssemblyName>gf</AssemblyName>
     <TargetFrameworkVersion>v4.6.1</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
