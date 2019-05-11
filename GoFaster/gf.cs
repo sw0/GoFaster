@@ -52,8 +52,8 @@ namespace Slin.GoFaster
         const int ColumnSize = 36;  // Console.WindowSize / _columnSize to get the column count
         const string ProfileFileName = "profile.xml";
         private const int Indent = 2;
-        static char[] _commaSpaceSeparater = new[] { ',', ' ' };
-        static char[] _spaceSeparater = new[] { ' ' };
+        static readonly char[] _commaSpaceSeparater = new[] { ',', ' ' };
+        static readonly char[] _spaceSeparater = new[] { ' ' };
 
         static Program()
         {
@@ -73,10 +73,11 @@ namespace Slin.GoFaster
             const string tmp = "<projectNameOrNo> b[ranch]:<branch abbr or name> --force";
             CmdSamples = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
             {
-                {"misc", "notepad[++], wcf, sql, ssms, inetmgr, p4v, postman|pm, mmc, db"},
+                {"*MISC*", "notepad[++], wcf, sql, ssms, inetmgr, p4v, postman|pm, mmc, db"},
                 {"SYNC", $"sync {tmp} f[orce]:1 --f"},
                 {"OPEN", $"open|code {tmp}"},
                 {"CODE", $"open|code {tmp}"},
+                {"CMD", $"cmd {tmp}"},
                 {"desc", $"desc {tmp}"},
                 {"HOSTS", "hosts; hosts open|folder|fld|restore;hosts set e[nv]|b[branch]:QA4 [for:repo2];\r\n\thosts set for:repo1,repo2,move e:dev merge:di;\r\n\thosts restore; hosts find h[ost]:server1v3|IP e:qa for=repo1"},
                 {"ls,list", "ls|list team:team8,alpha name:coreapi category:ecash"},
@@ -538,7 +539,7 @@ namespace Slin.GoFaster
                 }
                 else if (command.Equals("cmd", StringComparison.OrdinalIgnoreCase))
                 {
-                    ProcessCmdCmd(project, parameters);
+                    ProcessCmdCmd(project, branchName, parameters);
                 }
                 else if (command.Equals("wiki", StringComparison.OrdinalIgnoreCase))
                 {
@@ -840,11 +841,12 @@ namespace Slin.GoFaster
             }
         }
 
-        static void ProcessCmdCmd(Project project, Dictionary<string, string> parameters)
+        static void ProcessCmdCmd(Project project, string branchName, Dictionary<string, string> parameters)
         {
             if (!string.IsNullOrEmpty(project?.Path))
             {
                 var wd = Path.GetDirectoryName(project.Path);
+                if (!string.IsNullOrWhiteSpace(branchName)) wd = GetBranchedPath(wd, branchName);
                 var processStartInfo = new ProcessStartInfo();
                 processStartInfo.WorkingDirectory = wd;
                 processStartInfo.FileName = "cmd.exe";
