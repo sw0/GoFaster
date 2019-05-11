@@ -59,9 +59,9 @@ namespace Slin.GoFaster
         static Program()
         {
             CmdRegularExpressionString = $@"^\s*(?<command>sync|open|bld|build|start|folder|fld|code|url|wiki|cmd|desc|describe)\b(?:\s+(?<projNoOrName>[\._\w]+))?"
-            + $@"|^\s*(?<command>(?:list|ls|set))\b\s*"  //e.g. list /team:team8 /name:coreapi /category:ecash
+            + $@"|^\s*(?<command>(?:list|ls|set)\b)\s*"  //e.g. list /team:team8 /name:coreapi /category:ecash
             + $@"|^\s*(?<command>notepad|notepad\+\+|p4v|inetmgr|ssms|sql|iisreset|vs\d{4}|wcf|postman|pm)\b\s*"
-            + @"|^\s*(?<command>help|\?)\b\s*$"
+            + @"|^\s*(?<command>help\b|\?)\s*$"
             + @"|^\s*(?<command>mmc|eventviewer)\b\s*$"
             + @"|^\s*(?<command>uuid|guid)\b"
             + @"|^\s*(?<command>ping)\s+(?<action>.+)\s*$"  //action actually is IP or host name here
@@ -69,7 +69,7 @@ namespace Slin.GoFaster
             + @"|^\s*(?<command>db)\b(?:\s+(?<dbName>[-\w]+))?";  //set branch=int;
 
             _regAction = new Regex(CmdRegularExpressionString,
-                RegexOptions.Compiled | RegexOptions.IgnoreCase);
+                RegexOptions.Compiled | RegexOptions.IgnoreCase | RegexOptions.Multiline);
 
             try
             {
