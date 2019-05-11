@@ -46,7 +46,7 @@ namespace Slin.GoFaster
         internal static readonly Dictionary<string, string> KeyMapping = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         internal static readonly Dictionary<string, string> ValueMapping = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         internal static readonly Dictionary<string, string> HostsRepositories = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-        internal static readonly Dictionary<string, string> CmdSamples = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        internal static Dictionary<string, string> CmdSamples = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
         static bool _isFirstRun = false;
         static bool _enableLog = false;
@@ -75,26 +75,6 @@ namespace Slin.GoFaster
 
             _regAction = new Regex(CmdRegularExpressionString,
                 RegexOptions.Compiled | RegexOptions.IgnoreCase | RegexOptions.Multiline);
-
-            try
-            {
-                var xdoc = XDocument.Load(ManualFileName);
-                xdoc.Root.Elements().ToList().ForEach(node =>
-                {
-                    var cmdArr = node.Element("command").Value?.Trim()?.ToLower()
-                    ?.Split(_commaSpaceSeparater, StringSplitOptions.RemoveEmptyEntries);
-                    var sample = node.Element("sample").Value?.Trim();
-                    if (cmdArr != null && cmdArr.Length > 0 && sample != null)
-                    {
-                        cmdArr.ToList().ForEach(cmd =>
-                        {
-                            if (CmdSamples.ContainsKey(cmd)) return;
-                            CmdSamples[cmd] = sample;
-                        });
-                    }
-                });
-            }
-            catch (Exception ex) { WriteLine($"Error occurred in handling manual file: {ex.Message}"); }
 
             InitParametersMappings();
         }
@@ -304,6 +284,28 @@ namespace Slin.GoFaster
             {
                 Environment.CurrentDirectory = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
             }
+
+            #region --read manual.xml--
+            try
+            {
+                var xdoc = XDocument.Load(ManualFileName);
+                xdoc.Root.Elements().ToList().ForEach(node =>
+                {
+                    var cmdArr = node.Element("command").Value?.Trim()?.ToLower()
+                    ?.Split(_commaSpaceSeparater, StringSplitOptions.RemoveEmptyEntries);
+                    var sample = node.Element("sample").Value?.Trim();
+                    if (cmdArr != null && cmdArr.Length > 0 && sample != null)
+                    {
+                        cmdArr.ToList().ForEach(cmd =>
+                        {
+                            if (CmdSamples.ContainsKey(cmd)) return;
+                            CmdSamples[cmd] = sample;
+                        });
+                    }
+                });
+            }
+            catch (Exception ex) { WriteLine($"Error occurred in handling manual file: {ex.Message}"); }
+            #endregion
 
             #region --sync_init.cmd--
             var nl = Environment.NewLine;
