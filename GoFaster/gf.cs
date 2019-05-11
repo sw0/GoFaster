@@ -52,6 +52,7 @@ namespace Slin.GoFaster
         private static string CurrentCommand;
         const int ColumnSize = 36;  // Console.WindowSize / _columnSize to get the column count
         const string ProfileFileName = "profile.xml";
+        const string ManualFileName = "manual.xml";
         private const int Indent = 2;
         static readonly char[] _commaSpaceSeparater = new[] { ',', ' ' };
         static readonly char[] _spaceSeparater = new[] { ' ' };
@@ -73,7 +74,7 @@ namespace Slin.GoFaster
 
             try
             {
-                var xdoc = XDocument.Load("cmd-manual.xml");
+                var xdoc = XDocument.Load(ManualFileName);
                 xdoc.Root.Elements().ToList().ForEach(node =>
                 {
                     var cmdArr = node.Element("command").Value?.Trim()?.ToLower()
@@ -194,17 +195,7 @@ namespace Slin.GoFaster
                         Console.WriteLine($"STEP02:: command: {command}, action: {action}, projNoOrName: {projNoOrName}, default teams: {_defaultTeams} \r\nparameters: {string.Join(", ", parameters.Select(o => $"{o.Key}:{o.Value}").ToList())}");
                     if (",help,?,--help,".Contains($",{optionsString},".ToLower()))
                     {
-                        if (!CmdSamples.ContainsKey(command))
-                        {
-                            Help();
-                            goto STEP02;
-                        }
-                        old = Console.ForegroundColor;
-                        Console.ForegroundColor = ConsoleColor.DarkYellow;
-                        CmdSamples[command].Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries)
-                            .ToList().ForEach(eg => WriteLineIdt("* " + eg.Trim()));
-                        Console.ForegroundColor = old;
-
+                        Help(command, null);
                         goto STEP02;
                     }
 
@@ -978,17 +969,31 @@ namespace Slin.GoFaster
                 _enableLog = debug != "false" && debug != "0";
             }
         }
-        private static void Help(string title = "GF USAGE INFORMATION:")
+        private static void Help(string cmd = null, string title = "GF USAGE INFORMATION:")
         {
-            if (!string.IsNullOrEmpty(title))
+            if (title != null) //NOTE: only null would not be printed
                 Console.WriteLine(title);
+
+            const int CmdLength = 10;
 
             var old = Console.ForegroundColor;
             Console.ForegroundColor = ConsoleColor.DarkYellow;
-            foreach (var row in CmdSamples)
+            foreach (var row in CmdSamples.Where(k => string.IsNullOrWhiteSpace(cmd) ||
+                    k.Key.Equals(cmd, StringComparison.OrdinalIgnoreCase))
+                    .OrderBy(kvp => kvp.Key.ToLower()))
             {
-                var keys = row.Key.Split(_commaSpaceSeparater, StringSplitOptions.RemoveEmptyEntries);
-                keys.ToList().ForEach(key => WriteLineIdt($"{key}\t{row.Value}"));
+                //var keys = row.Key.Split(_commaSpaceSeparater, StringSplitOptions.RemoveEmptyEntries);
+                //keys.ToList().ForEach(key => WriteLineIdt($"{key}\t{row.Value}"));
+                var lines = row.Value.Split(new[] { '\r', '\n', ';' }, StringSplitOptions.RemoveEmptyEntries).ToList();
+                for (int i = 0; i < lines.Count; i++)
+                {
+                    if (i == 0)
+                        WriteLineIdt($"{row.Key.PadRight(CmdLength)}{lines[i].Trim()}");
+                    else
+                        WriteLineIdt($"{new string(' ', CmdLength)}{lines[i].Trim()}");
+                }
+
+                //if (string.IsNullOrWhiteSpace(cmd)) WriteLine();
             }
             Console.ForegroundColor = old;
         }

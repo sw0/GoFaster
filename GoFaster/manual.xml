@@ -53,7 +53,7 @@
   <cmd>
     <command>wiki</command>
     <sample>
-      <![CDATA[wiki; wiki 31; wiki PinService; wiki pinser]]>
+      <![CDATA[wiki; wiki 31; wiki PinService; wiki pinser --[cp|copy]]]>
     </sample>
   </cmd>
   <cmd>
@@ -65,7 +65,7 @@
   <cmd>
     <command>fld,folder</command>
     <sample>
-      <![CDATA[fld|folder [projectNameOrNo]]]>
+      <![CDATA[fld|folder [projectNameOrNo] --[cp|copy]]]>
     </sample>
   </cmd>
   <cmd>
@@ -77,7 +77,7 @@
   <cmd>
     <command>uuid,guid</command>
     <sample>
-      <![CDATA[uuid|guid]]>
+      <![CDATA[uuid|guid, generate a new guid and set to clipboard]]>
     </sample>
   </cmd>
   <cmd>
