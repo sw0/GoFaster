@@ -1,0 +1,89 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+<commands>
+  <cmd>
+    <command>*MISC*</command>
+    <sample>
+      <![CDATA[notepad[++], wcf, sql, ssms, inetmgr, p4v, postman|pm, mmc, db]]>
+    </sample>
+  </cmd>
+  <cmd>
+    <command>SYNC</command>
+    <sample>
+      <![CDATA[sync {{projectNameOrNo}} b[ranch]:{{branch abbr or name}} --force f[orce]:1 --f]]>
+    </sample>
+  </cmd>
+  <cmd>
+    <command>OPEN</command>
+    <sample>
+      <![CDATA[open|code {{projectNameOrNo}} b[ranch]:{{branch abbr or name}} --force]]>
+    </sample>
+  </cmd>
+  <cmd>
+    <command>CODE</command>
+    <sample>
+      <![CDATA[open|code {{projectNameOrNo}} b[ranch]:{{branch abbr or name}} --force]]>
+    </sample>
+  </cmd>
+  <cmd>
+    <command>CMD</command>
+    <sample>
+      <![CDATA[cmd {{projectNameOrNo}} b[ranch]:{{branch abbr or name}} --force]]>
+    </sample>
+  </cmd>
+  <cmd>
+    <command>desc</command>
+    <sample>
+      <![CDATA[desc {{projectNameOrNo}} b[ranch]:{{branch abbr or name}} --force]]>
+    </sample>
+  </cmd>
+  <cmd>
+    <command>HOSTS</command>
+    <sample>
+      <![CDATA[hosts; hosts open|folder|fld|restore;hosts set e[nv]|b[branch]:QA4 [for:repo2];
+		hosts set for:repo1,repo2,move e:dev merge:di;
+		hosts restore; hosts find h[ost]:server1v3|IP e:qa for=repo1]]>
+    </sample>
+  </cmd>
+  <cmd>
+    <command>ls,list</command>
+    <sample>
+      <![CDATA[ls|list team:team8,alpha name:coreapi category:ecash]]>
+    </sample>
+  </cmd>
+  <cmd>
+    <command>wiki</command>
+    <sample>
+      <![CDATA[wiki; wiki 31; wiki PinService; wiki pinser]]>
+    </sample>
+  </cmd>
+  <cmd>
+    <command>url</command>
+    <sample>
+      <![CDATA[url 31; url PinService; url pinser type=swagger]]>
+    </sample>
+  </cmd>
+  <cmd>
+    <command>fld,folder</command>
+    <sample>
+      <![CDATA[fld|folder [projectNameOrNo]]]>
+    </sample>
+  </cmd>
+  <cmd>
+    <command>bld,bld</command>
+    <sample>
+      <![CDATA[bld|build {{projectNameOrNo}} b[ranch]:{{branch abbr or name}} --force]]>
+    </sample>
+  </cmd>
+  <cmd>
+    <command>uuid,guid</command>
+    <sample>
+      <![CDATA[uuid|guid]]>
+    </sample>
+  </cmd>
+  <cmd>
+    <command>cls,clear,q</command>
+    <sample>
+      <![CDATA[clear|cls console]]>
+    </sample>
+  </cmd>
+</commands>

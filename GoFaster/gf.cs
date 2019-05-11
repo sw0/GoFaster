@@ -9,6 +9,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 using System.Windows.Forms;
 using System.Xml;
+using System.Xml.Linq;
 using System.Xml.Serialization;
 
 namespace Slin.GoFaster
@@ -58,36 +59,37 @@ namespace Slin.GoFaster
         static Program()
         {
             CmdRegularExpressionString = $@"^\s*(?<command>sync|open|bld|build|start|folder|fld|code|url|wiki|cmd|desc|describe)\b(?:\s+(?<projNoOrName>[\._\w]+))?"
-            + $@"|^\s*(?<command>(?:list|ls|set)\b)\s*"  //e.g. list /team:team8 /name:coreapi /category:ecash
+            + $@"|^\s*(?<command>(?:list|ls|set))\b\s*"  //e.g. list /team:team8 /name:coreapi /category:ecash
             + $@"|^\s*(?<command>notepad|notepad\+\+|p4v|inetmgr|ssms|sql|iisreset|vs\d{4}|wcf|postman|pm)\b\s*"
             + @"|^\s*(?<command>help|\?)\b\s*$"
             + @"|^\s*(?<command>mmc|eventviewer)\b\s*$"
             + @"|^\s*(?<command>uuid|guid)\b"
             + @"|^\s*(?<command>ping)\s+(?<action>.+)\s*$"  //action actually is IP or host name here
-            + $@"|^\s*(?<command>hosts\b)(?:\s+(?<action>open|set|find|restore|fld|folder))?\s*"  //host, env, for:
-            + @"|^\s*(?<command>db\b)(?:\s+(?<dbName>[-\w]+))?";  //set branch=int;
+            + $@"|^\s*(?<command>hosts)\b(?:\s+(?<action>open|set|find|restore|fld|folder))?\s*"  //host, env, for:
+            + @"|^\s*(?<command>db)\b(?:\s+(?<dbName>[-\w]+))?";  //set branch=int;
 
             _regAction = new Regex(CmdRegularExpressionString,
                 RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
-            const string tmp = "<projectNameOrNo> b[ranch]:<branch abbr or name> --force";
-            CmdSamples = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            try
             {
-                {"*MISC*", "notepad[++], wcf, sql, ssms, inetmgr, p4v, postman|pm, mmc, db"},
-                {"SYNC", $"sync {tmp} f[orce]:1 --f"},
-                {"OPEN", $"open|code {tmp}"},
-                {"CODE", $"open|code {tmp}"},
-                {"CMD", $"cmd {tmp}"},
-                {"desc", $"desc {tmp}"},
-                {"HOSTS", "hosts; hosts open|folder|fld|restore;hosts set e[nv]|b[branch]:QA4 [for:repo2];\r\n\thosts set for:repo1,repo2,move e:dev merge:di;\r\n\thosts restore; hosts find h[ost]:server1v3|IP e:qa for=repo1"},
-                {"ls,list", "ls|list team:team8,alpha name:coreapi category:ecash"},
-                {"wiki", "wiki; wiki 31; wiki PinService; wiki pinser"},
-                {"url", "wiki; wiki 31; wiki PinService; wiki pinser"},
-                {"fld,folder", "fld|folder [projectNameOrNo]"},
-                {"bld,bld", $"bld|build {tmp}"},
-                {"uuid,guid", $"uuid|guid"},
-                {"cls,clear,q", $"clear|cls console"},
-            };
+                var xdoc = XDocument.Load("cmd-manual.xml");
+                xdoc.Root.Elements().ToList().ForEach(node =>
+                {
+                    var cmdArr = node.Element("command").Value?.Trim()?.ToLower()
+                    ?.Split(_commaSpaceSeparater, StringSplitOptions.RemoveEmptyEntries);
+                    var sample = node.Element("sample").Value?.Trim();
+                    if (cmdArr != null && cmdArr.Length > 0 && sample != null)
+                    {
+                        cmdArr.ToList().ForEach(cmd =>
+                        {
+                            if (CmdSamples.ContainsKey(cmd)) return;
+                            CmdSamples[cmd] = sample;
+                        });
+                    }
+                });
+            }
+            catch (Exception ex) { WriteLine($"Error occurred in handling manual file: {ex.Message}"); }
 
             InitParametersMappings();
         }
@@ -185,11 +187,26 @@ namespace Slin.GoFaster
                         command = "open";
 
                     var matchedCmd = matchAction.ToString();
-                    var optionsString = inputCmd.Substring(matchedCmd.Length);
+                    var optionsString = inputCmd.Substring(matchedCmd.Length).Trim();
                     var parameters = ResolveOptions(command, action, optionsString.Split(_spaceSeparater, StringSplitOptions.RemoveEmptyEntries));
 
                     if (_enableLog)
                         Console.WriteLine($"STEP02:: command: {command}, action: {action}, projNoOrName: {projNoOrName}, default teams: {_defaultTeams} \r\nparameters: {string.Join(", ", parameters.Select(o => $"{o.Key}:{o.Value}").ToList())}");
+                    if (",help,?,--help,".Contains($",{optionsString},".ToLower()))
+                    {
+                        if (!CmdSamples.ContainsKey(command))
+                        {
+                            Help();
+                            goto STEP02;
+                        }
+                        old = Console.ForegroundColor;
+                        Console.ForegroundColor = ConsoleColor.DarkYellow;
+                        CmdSamples[command].Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries)
+                            .ToList().ForEach(eg => WriteLineIdt("* " + eg.Trim()));
+                        Console.ForegroundColor = old;
+
+                        goto STEP02;
+                    }
 
                     GoAction(command, action, projNoOrName, AllProjects, parameters);
 
