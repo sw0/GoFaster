@@ -21,10 +21,10 @@ namespace Slin.GoFaster
          * 0.3.0.0  rename P4Cmd to GoFaster and use gf as assembly name
          * 0.4.0.0  process `CmdEntry`, introduce uuid, support > cmd {project}; TODO to support lscmd
          * 0.5.0.0  improvement and bug fixing
-         * 0.6.0.0  require administrator priviliages by introducing app.manifest.
+         * 1.0.0.0  require administrator priviliages by introducing app.manifest.
          * */
         const string AppName = "GoFaster";
-        const string AppVersion = "0.6.0.0";
+        const string AppVersion = "1.0.0.0";
         private static string CmdRegularExpressionString;
         static Regex RegBranch;
         static readonly Regex RegArgs = new Regex(@"/?\b(?<optkey>[a-zA-Z]+)[\:|=](?<optval>[^""\s]+|""(?:[^""]+""))|-(?<optval>[a-zA-Z]+)\s+(?<optval>[^""\s]+|""(?:[^""]+)"")|--(?<optflag>[a-zA-Z]+)");
