@@ -42,7 +42,7 @@ namespace Slin.GoFaster
         static List<Project> CurrentProjects = new List<Project>();
         static List<CmdEntry> CmdEntries = new List<CmdEntry>();
 
-        static readonly string AllCommandNamesNoNeedProject = ",list,ls,lscmd,cmd,mmc,ping,eventviewer,notepad,notepad++,desc,describe,wiki,p4v,inetmgr,ssms,sql,postman,pm,iisreset,help,?,set,db,hosts,folder,fld,code,wcf,uuid,guid,";
+        static readonly string AllCommandNamesNoNeedProject = ",list,ls,lscmd,cmd,mmc,ping,eventviewer,notepad,notepad++,desc,describe,wiki,p4v,inetmgr,ssms,sql,postman,pm,iisreset,help,?,set,db,hosts,folder,fld,code,wcf,uuid,guid,donate,";
         const string FolderHost = @"C:\Windows\System32\drivers\etc\";
         internal static readonly Dictionary<string, string> KeyMapping = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         internal static readonly Dictionary<string, string> ValueMapping = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
@@ -62,6 +62,9 @@ namespace Slin.GoFaster
         static readonly char[] _commaSpaceSeparater = new[] { ',', ' ' };
         static readonly char[] _spaceSeparater = new[] { ' ' };
 
+        //TODO using donation link? or using paypal.me?
+        static string PPDonationLink = @"https://paypal.me/...";
+
         static Program()
         {
             CmdRegularExpressionString = $@"^\s*(?<command>sync|open|bld|build|start|folder|fld|code|url|wiki|cmd|desc|describe)\b(?:\s+(?<projNoOrName>[\._\w]+))?"
@@ -70,6 +73,7 @@ namespace Slin.GoFaster
             + @"|^\s*(?<command>help\b|\?)\s*$"
             + @"|^\s*(?<command>mmc|eventviewer)\b\s*$"
             + @"|^\s*(?<command>uuid|guid)\b"
+            + @"|^\s*(?<command>donate)\b"
             + @"|^\s*(?<command>ping)\s+(?<action>.+)\s*$"  //action actually is IP or host name here
             + $@"|^\s*(?<command>hosts)\b(?:\s+(?<action>open|set|find|restore|fld|folder))?\s*"  //host, env, for:
             + @"|^\s*(?<command>db)\b(?:\s+(?<dbName>[-\w]+))?";  //set branch=int;
@@ -138,7 +142,7 @@ namespace Slin.GoFaster
             Console.WriteLine("> 'sync|open|build|bld|desc|folder|fld|code|url <projNoOrName> [b:<branch>]';");
             WriteLineIdt($"'hosts open/set [e[nv]:local|di|dev-int|qa4|qa3[-nonasm]|QA|STG] [for:default|repo1|repo2|move]'");
             WriteLineIdt($"'wiki|notepad(++)|p4v|inetmgr|ssms|sql|mmc|cmd|postman|pm|iisreset|list|ls|wcf' for help, run p4v, list projects");
-            WriteLineIdt($"'?' or '<cmd> ?' for help. 'exit|quit|q|cls|clear' to quit/clear.");
+            WriteLineIdt($"'?' or '<cmd> ?' for help. 'exit|quit|q|cls|clear' to quit/clear. Or try 'donate' if you like this tool :) Thanks!");
             Console.ForegroundColor = old;
 
         STEP02:
@@ -193,7 +197,6 @@ namespace Slin.GoFaster
 
                     goto STEP02;
                 }
-
 
                 if (!string.IsNullOrWhiteSpace(inputCmd) && inputCmd.StartsWith(":") && CmdEntries != null)
                 {
@@ -655,6 +658,10 @@ namespace Slin.GoFaster
                 {
                     var guid = Guid.NewGuid().ToString();
                     Clipboard.SetText(guid); WriteLineIdt($"guid copied to clipboard: {guid}");
+                }
+                else if ("donate" == command)
+                {
+                    Process.Start(PPDonationLink);
                 }
                 else if ((new[] { "desc", "describe" }).Contains(command))
                 {
