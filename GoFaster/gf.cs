@@ -63,7 +63,7 @@ namespace Slin.GoFaster
         static readonly char[] _spaceSeparater = new[] { ' ' };
 
         //TODO using donation link? or using paypal.me?
-        static string PPDonationLink = @"https://paypal.me/...";
+        static string PPDonationLink = @"https://www.paypal.com/cgi-bin/webscr?cmd=_donations&business=LINSW%40LIVE.CN&lc=&no_note=0&item_name=support+Go+Faster+developer&cn=&currency_code=&bn=PP-DonationsBF:btn_donateCC_LG.gif:NonHosted";
 
         static Program()
         {
