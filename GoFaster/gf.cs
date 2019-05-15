@@ -22,9 +22,10 @@ namespace Slin.GoFaster
          * 0.4.0.0  process `CmdEntry`, introduce uuid, support > cmd {project}; TODO to support lscmd
          * 0.5.0.0  improvement and bug fixing
          * 1.0.0.0  require administrator priviliages by introducing app.manifest.
+         * 2.0.0.0  support searching in category, name with regular expression
          * */
         const string AppName = "GoFaster";
-        const string AppVersion = "1.0.0.0";
+        const string AppVersion = "2.0.0.0";
         private static string CmdRegularExpressionString;
         static Regex RegBranch;
         static readonly Regex RegArgs = new Regex(@"/?\b(?<optkey>[a-zA-Z]+)[\:|=](?<optval>[^""\s]+|""(?:[^""]+""))|-(?<optval>[a-zA-Z]+)\s+(?<optval>[^""\s]+|""(?:[^""]+)"")|--(?<optflag>[a-zA-Z]+)");
@@ -406,22 +407,34 @@ namespace Slin.GoFaster
             owners = owners ?? new string[0];
             CurrentProjects = AllProjects.Where(p => owners.Length == 0
                || owners.Contains("all", StringComparer.OrdinalIgnoreCase)
-                //|| "all".Equals(owner, StringComparison.OrdinalIgnoreCase)
-                || owners.Any(owner => (owner.StartsWith("\"")) && owner.Equals(p.Owner.Trim(new[] { '"' }), StringComparison.OrdinalIgnoreCase))
-                || owners.Any(owner => p.Owner.IndexOf(owner, StringComparison.OrdinalIgnoreCase) >= 0)).ToList();
+                || owners.Any(owner => TryIsMatch(p.Owner, owner))).ToList();
 
             CurrentProjects = CurrentProjects.Where(p => string.IsNullOrEmpty(category)
-                || (!category.StartsWith("\"")) && p.Category.Split(_commaSpaceSeparater, StringSplitOptions.RemoveEmptyEntries).Any(c => category.Equals(c, StringComparison.OrdinalIgnoreCase))
-                || p.Category.Split(_commaSpaceSeparater, StringSplitOptions.RemoveEmptyEntries).Any(c => c.IndexOf(category, StringComparison.OrdinalIgnoreCase) >= 0)).ToList();
+                || p.Category.Split(_commaSpaceSeparater, StringSplitOptions.RemoveEmptyEntries)
+                    .Any(c => TryIsMatch(c, category, RegexOptions.IgnoreCase))).ToList();
 
             var list = CurrentProjects;
             if (!string.IsNullOrWhiteSpace(name))
-                list = list.Where(p => name == "*" || p.Name.IndexOf(name, StringComparison.OrdinalIgnoreCase) >= 0).ToList();
+            {
+                try
+                {
+                    list = list.Where(p => name == "*" || TryIsMatch(p.Name, name)).ToList();
+                }
+                catch (Exception ex)
+                {
+                    WriteLineIdt($"option name '{name}' is in bad format: {ex.Message}"); return;
+                }
+            }
 
             if (_enableLog)
                 Console.WriteLine($"AllProjects: {AllProjects.Count}, CurrentProjects: {CurrentProjects.Count}, list:  {list.Count}, owner: {String.Join(",", owners)}, category: {category}, name: {name}");
 
             var groups = list.GroupBy(item => item.Owner.ToUpper());
+            if (groups.Count() == 0 && !string.IsNullOrEmpty(name))
+            {
+                WriteLineIdt($"cannot find the project with name matching pattern '{name}'");
+                return;
+            }
 
             foreach (var g in groups.OrderBy(g => g.Key))
             {
@@ -498,10 +511,8 @@ namespace Slin.GoFaster
 
         static Project GetProj(string projName)
         {
-            var proj = CurrentProjects.FirstOrDefault<Project>(p => p.Name.Equals(projName, StringComparison.OrdinalIgnoreCase));
-
-            if (proj == null)
-                proj = CurrentProjects.FirstOrDefault(p => p.Name.IndexOf(projName, StringComparison.OrdinalIgnoreCase) != -1);
+            var proj = CurrentProjects.FirstOrDefault(p => p.Name.Equals(projName, StringComparison.OrdinalIgnoreCase))
+            ?? CurrentProjects.FirstOrDefault(p => TryIsMatch(p.Name, projName));
 
             return proj;
         }
@@ -1035,7 +1046,7 @@ namespace Slin.GoFaster
                     return;
                 }
 
-                WriteIdt($"not found: {projectPath}");
+                WriteIdt($"file not found: {projectPath}");
                 if (Console.CursorLeft > 0 && Console.CursorLeft != Console.WindowWidth) Console.WriteLine();
                 WriteLineIdt("please sync the code firstly like 'sync <projNameOrNo> [b:integration]'.");
             }
@@ -1400,6 +1411,12 @@ namespace Slin.GoFaster
             }
 
             return dic;
+        }
+
+        static bool TryIsMatch(string input, string pattern, RegexOptions option = RegexOptions.IgnoreCase)
+        {
+            try { return Regex.IsMatch(input, pattern, option); } catch { }
+            return false;
         }
 
         static void WriteLine(string msg = null)
