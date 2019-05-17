@@ -24,9 +24,10 @@ namespace Slin.GoFaster
          * 1.0.0.0  require administrator priviliages by introducing app.manifest.
          * 2.0.0.0  support searching in category, name with regular expression
          * 2.0.0.1  support vs|vs{\d4} command to launch VS
+         * 2.0.0.2  support launch visual studio command: vscmd
          * */
         const string AppName = "GoFaster";
-        const string AppVersion = "2.0.0.1";
+        const string AppVersion = "2.0.0.2";
         private static string CmdRegularExpressionString;
         static Regex RegBranch;
         static readonly Regex RegArgs = new Regex(@"/?\b(?<optkey>[a-zA-Z]+)[\:|=](?<optval>[^""\s]+|""(?:[^""]+""))|-(?<optval>[a-zA-Z]+)\s+(?<optval>[^""\s]+|""(?:[^""]+)"")|--(?<optflag>[a-zA-Z]+)");
@@ -36,6 +37,8 @@ namespace Slin.GoFaster
         static readonly Regex _regAction = null;
         static readonly Regex _regP4Workspace = new Regex(@"^c:\\P4", RegexOptions.Compiled | RegexOptions.IgnoreCase);
         static readonly Regex _regP4Config = new Regex(@"REM\s+--START\s*P4(.+)REM --END P4 CONFIG--", RegexOptions.Compiled | RegexOptions.Singleline);
+
+        static List<string> VSExes = null;
 
         static string _workingBranch;
         static string DefaultWorkingBranch;
@@ -75,7 +78,7 @@ namespace Slin.GoFaster
             + @"|^\s*(?<command>help\b|\?)\s*$"
             + @"|^\s*(?<command>mmc|eventviewer)\b\s*$"
             + @"|^\s*(?<command>uuid|guid)\b"
-            + @"|^\s*(?<command>vs\d{4}|vs)\s*$"
+            + @"|^\s*(?<command>vs\d{4}|vs|vscmd)\s*$"
             + @"|^\s*(?<command>donate)\b"
             + @"|^\s*(?<command>ping)\s+(?<action>.+)\s*$"  //action actually is IP or host name here
             + $@"|^\s*(?<command>hosts)\b(?:\s+(?<action>open|set|find|restore|fld|folder))?\s*"  //host, env, for:
@@ -397,6 +400,26 @@ namespace Slin.GoFaster
             }
 
             #endregion
+
+            #region -- find all visual studio installed --
+            {
+                var vsBaseDir = @"C:\Program Files (x86)\Microsoft Visual Studio\";
+                var subDirs = Directory.GetDirectories(vsBaseDir, "20*");
+                var versions = new[] { "Enterprise", "Professional", "Community" };
+                //todo cache these exe locations
+                VSExes = subDirs.ToList().SelectMany(dir =>
+                {
+                    var exeList = new List<string>();
+                    foreach (var ver in versions)
+                    {
+                        var exefile = dir + $@"\{ver}\Common7\IDE\devenv.exe";
+                        if (File.Exists(exefile))
+                            exeList.Add(exefile);
+                    }
+                    return exeList;
+                }).ToList();
+            }
+            #endregion
         }
 
         private static void ListProjects(IDictionary<string, string> parameters)
@@ -673,6 +696,10 @@ namespace Slin.GoFaster
                     var guid = Guid.NewGuid().ToString();
                     Clipboard.SetText(guid); WriteLineIdt($"guid copied to clipboard: {guid}");
                 }
+                else if ("vscmd" == command)
+                {
+                    LaunchVSCmd(command, parameters);
+                }
                 else if (Regex.IsMatch(command, "^vs(?:\\d{4})?$"))
                 {
                     LaunchVS(command, parameters);
@@ -708,33 +735,34 @@ namespace Slin.GoFaster
             return project;
         }
 
+        static void LaunchVSCmd(string command, Dictionary<string, string> parameters) {
+            //%comspec% /k "C:\Program Files (x86)\Microsoft Visual Studio\2017\Professional\Common7\Tools\VsDevCmd.bat"
+            var vsExe = VSExes.FirstOrDefault();
+            var cmdBat = string.Empty;
+            if (vsExe != null && File.Exists(cmdBat = vsExe.Replace("IDE\\devenv.exe", "Tools\\VsDevCmd.bat"))) {
+                var wd = Path.GetFullPath(vsExe).ToLower();
+                var p = new Process();
+                p.StartInfo.FileName = "cmd.exe";
+                p.StartInfo.WorkingDirectory = wd.Substring(0, wd.IndexOf("\\common"));
+                p.StartInfo.Arguments = $"/k \"{cmdBat}\"";
+                p.StartInfo.RedirectStandardOutput = false;
+                p.StartInfo.UseShellExecute = true;
+                p.StartInfo.CreateNoWindow = true;
+                p.Start();
+            }
+        }
         static void LaunchVS(string command, Dictionary<string, string> parameters)
         {
-            var vsBaseDir = @"C:\Program Files (x86)\Microsoft Visual Studio\";
-            var subDirs = Directory.GetDirectories(vsBaseDir, "20*");
-            var versions = new[] { "Enterprise", "Professional", "Community" };
-            //todo cache these exe locations
-            var vsExes = subDirs.ToList().SelectMany(dir =>
-            {
-                var exeList = new List<string>();
-                foreach (var ver in versions)
-                {
-                    var exefile = dir + $@"\{ver}\Common7\IDE\devenv.exe";
-                    if (File.Exists(exefile))
-                        exeList.Add(exefile);
-                }
-                return exeList;
-            }).ToList();
             var verInCmd = (string)null;
             var vsExe2Run = (string)null;
             var givenVersionNotFound = command.Length == 6;
-            if (vsExes.Count > 0 && command.Length == 6
-                && subDirs.Any(s => s.EndsWith(verInCmd = command.Substring(2))))//contains vs version
+            if (VSExes.Count > 0 && command.Length == 6
+                && VSExes.Any(s => s.Contains(verInCmd = command.Substring(2))))//contains vs version
             {
-                vsExe2Run = vsExes.FirstOrDefault(s => s.Contains(verInCmd));
+                vsExe2Run = VSExes.FirstOrDefault(s => s.Contains(verInCmd));
                 givenVersionNotFound = false;
             }
-            vsExe2Run = vsExe2Run ?? vsExes.FirstOrDefault();
+            vsExe2Run = vsExe2Run ?? VSExes.FirstOrDefault();
             if (givenVersionNotFound || vsExe2Run == null)
             {
                 Console.WriteLine("given version of VS not found");
