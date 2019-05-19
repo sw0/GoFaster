@@ -11,6 +11,7 @@ GF (GoFaster) is a command line tool for daily work to sync code from perforce, 
 * list all the projects we have and easily for developer to find by full name, partial name or number
 * sync the code from Perforce, really helpful when the projects inside the solution came from different folders
 * use `hosts set <options>` command to switch hosts file right away according to working projects
+* especially for new members, they can easily get the code and related information. 
 
 # Get Started
 After you download GF (GoFaster), before you run the GoFaster tool, you need to make some configurations in gf.exe.config file:
@@ -100,3 +101,55 @@ Synchronize the code from source control server, here it's Perforce.
     <img src="https://github.com/sw0/GoFaster/blob/dev/manual-gifs/gf-002-sync.gif?raw=true"/>
 </details>
 
+## open solution/project
+**Example**
+    ```bash
+    > 1     #open project with number = 1
+    > HelloWorld  #open solution/project with name containing 'helloworld'
+    > HelloW      # open solution/project with name containing 'hellow'
+    > ^Hello      # open solution/project with name starts with 'hello'
+    > orld$       # open solution/project with name ending with 'orld'
+    > open 1
+    > open ^Hello 
+    > open orld$ b:int
+    > open world b:integration  #open solution/project for 'integration' branch with name containing 'world'
+    ```
+
+## folder:fld: open folder/get folder for given project
+**Example**
+    ```bash
+    > folder 1
+    > folder HelloWorld b:int
+    > folder ^Hello b:int --copy
+
+    ```
+## build|bld: build project
+It will launch a new command prompt and use `MSBuild` to bulid the solution or project for you.
+**Example**
+    ```
+    > build 1
+
+    > bld HelloWorld b:int
+
+    ```
+
+## VS, VS20XX: launch Visual Studio
+**Example**
+    ```bash
+    > vs
+
+    > vs2017
+
+    > vs2019
+
+    ```
+
+## vscmd: launch Developer Command Prompt for Visual Studio
+`vscmd` will launch the Developer Command Prompt to Visual Studio, and you can use `msbuild` etc command inside VSCMD.
+**Example**
+    ```bash
+    > vscmd
+    ```
+
+# TODOs
+ Setup applications/virtual directories for project in IIS.
