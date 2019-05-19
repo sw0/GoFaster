@@ -57,19 +57,21 @@ If you are not the case, please ignore this part.
 List the projects with your given options: team, project name, category. the name can be full name or partial name. So it will be really convenient for you to find projects if there are too many projects in your teams.
 
 **Examples**
-	``` bash
-	> ls
+``` bash
+> ls
+# list all projects filtered by dfault teams setting in configuration
 
-	> ls team:name-of-team name:name-of-project category:name-of-category
+> ls team:alph name:coreapi
+# list projects by team:name-of-team name:name-of-project category:name-of-category
 
-	# NOTE: name can be partial name
-	> ls team:^start-part-name-of-team  name:end-part-name-of-project$
+> ls team:^start-part-name-of-team  name:end-part-name-of-project$
+# NOTE: name can be partial name
 
-	> ls team:all
+> ls team:all
 
-	--short command pattern
-	> ls name-or-number-of-project
-	```
+--short command pattern
+> ls name-or-number-of-project
+```
 
     You can set your default teams in gf.exe.config file, that only the projects owned by the teams will be listed.
 
@@ -82,19 +84,19 @@ List the projects with your given options: team, project name, category. the nam
 Synchronize the code from source control server, here it's Perforce.
 
 **Example**
-	``` bash
-	> sync 1   #sync the code for project with number 1
+``` bash
+> sync 1   #sync the code for project with number 1
 
-	> sync HelloWorld  b:int  # sync the code for 'integration' branch for project with name contains "helloworld"
+> sync HelloWorld  b:int  # sync the code for 'integration' branch for project with name contains "helloworld"
 
-	> sync ^Hello --force #force sync the code for project with name starts with 'Hello'
+> sync ^Hello --force #force sync the code for project with name starts with 'Hello'
 
-	> sync orld$ b:integration --force  #force sync the integration branch code for project with name ends with 'orld'
+> sync orld$ b:integration --force  #force sync the integration branch code for project with name ends with 'orld'
 
-	> sync ell b:offcycle
+> sync ell b:offcycle
 
-	> sync ell b:off --force
-	```
+> sync ell b:off --force
+```
 
 <details>
     <summary>Click to expand: demonstration video for `sync` command</summary>
@@ -103,53 +105,49 @@ Synchronize the code from source control server, here it's Perforce.
 
 ## open solution/project
 **Example**
-    ```bash
-    > 1     #open project with number = 1
-    > HelloWorld  #open solution/project with name containing 'helloworld'
-    > HelloW      # open solution/project with name containing 'hellow'
-    > ^Hello      # open solution/project with name starts with 'hello'
-    > orld$       # open solution/project with name ending with 'orld'
-    > open 1
-    > open ^Hello 
-    > open orld$ b:int
-    > open world b:integration  #open solution/project for 'integration' branch with name containing 'world'
-    ```
+```bash
+> 1     #open project with number = 1
+> HelloWorld  #open solution/project with name containing 'helloworld'
+> HelloW      # open solution/project with name containing 'hellow'
+> ^Hello      # open solution/project with name starts with 'hello'
+> orld$       # open solution/project with name ending with 'orld'
+> open 1
+> open ^Hello 
+> open orld$ b:int
+> open world b:integration  #open solution/project for 'integration' branch with name containing 'world'
+```
 
 ## folder:fld: open folder/get folder for given project
 **Example**
-    ```bash
-    > folder 1
-    > folder HelloWorld b:int
-    > folder ^Hello b:int --copy
+```bash
+> folder 1
+> folder HelloWorld b:int
+> folder ^Hello b:int --copy
+```
 
-    ```
 ## build|bld: build project
 It will launch a new command prompt and use `MSBuild` to bulid the solution or project for you.
 **Example**
-    ```
-    > build 1
+```bash
+> build 1
 
-    > bld HelloWorld b:int
-
-    ```
+> bld HelloWorld b:int
+```
 
 ## VS, VS20XX: launch Visual Studio
 **Example**
-    ```bash
-    > vs
-
-    > vs2017
-
-    > vs2019
-
-    ```
+```bash
+> vs
+> vs2017
+> vs2019
+```
 
 ## vscmd: launch Developer Command Prompt for Visual Studio
 `vscmd` will launch the Developer Command Prompt to Visual Studio, and you can use `msbuild` etc command inside VSCMD.
 **Example**
-    ```bash
-    > vscmd
-    ```
+```bash
+> vscmd  #launch developer command prompty installed
+```
 
 # TODOs
  Setup applications/virtual directories for project in IIS.
