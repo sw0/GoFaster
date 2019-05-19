@@ -23,30 +23,32 @@ After you download GF (GoFaster), before you run the GoFaster tool, you need to 
     <add key="P4Workspace" value="C:\P4\" />
 ```
 2. Set default working branch name and all available branches
-2.1. **IMPORTANT:** about working branch, some comany may use "current", some may use "dev" or "development", please set it right according your case.
-```
-    <!-- DefaultWorkingBranch -->
-    <add key="DefaultWorkingBranch" value="current" />
-```
-2.2. **IMPORTANT:** Set `BranchRegexPattern` which will be used to replace the path for your projects/solution file.
-``` xml
-    <!-- Very Important: -->
-    <add key="BranchRegexPattern" value="\\(current|offcycle|integration|production|trunk|release)\\" />
-```
+
+    2.1. **IMPORTANT:** about working branch, some comany may use "current", some may use "dev" or "development", please set it right according your case.
+	```
+		<!-- DefaultWorkingBranch -->
+		<add key="DefaultWorkingBranch" value="current" />
+	```
+
+    2.2. **IMPORTANT:** Set `BranchRegexPattern` which will be used to replace the path for your projects/solution file.
+	``` xml
+		<!-- Very Important: -->
+		<add key="BranchRegexPattern" value="\\(current|offcycle|integration|production|trunk|release)\\" />
+	```
 
 3. Set hosts repositories
 We commonly use server name for different services, and we use alias for server name, so the name would be same for different environments(DEV, INTEGRATION, QA, UAT, PRODUCTION). So hosts varies by environment. 
 If you are not the case, please ignore this part. 
 
-**Dependence:** Perforce.
-``` xml
-    <!--hosts repositories: name:p4path:environment-names-with-comma-->
-    <add key="HostsRepositories" value="
-         default:\\SCM\Configs\HOSTS\:DEV-INT,DEV-INT2,QA-2,QA-3,QA-4,QA-5;
-         repo1:\\REPO1\Utils\hosts\:DEV,INT,QA,UAT,PROD;
-         repo2:\\REPO2\Utils\hosts\:DEV,INT,QA,STG;
-         repo3:\\REPO3\Utils\hosts\:DEV,INT,QA,STG;" />
-```
+	**Dependence:** Perforce.
+	``` xml
+		<!--hosts repositories: name:p4path:environment-names-with-comma-->
+		<add key="HostsRepositories" value="
+			 default:\\SCM\Configs\HOSTS\:DEV-INT,DEV-INT2,QA-2,QA-3,QA-4,QA-5;
+			 repo1:\\REPO1\Utils\hosts\:DEV,INT,QA,UAT,PROD;
+			 repo2:\\REPO2\Utils\hosts\:DEV,INT,QA,STG;
+			 repo3:\\REPO3\Utils\hosts\:DEV,INT,QA,STG;" />
+	```
 4. Add your projects into profile.xml
 
 # Features
@@ -54,22 +56,47 @@ If you are not the case, please ignore this part.
 List the projects with your given options: team, project name, category. the name can be full name or partial name. So it will be really convenient for you to find projects if there are too many projects in your teams.
 
 **Examples**
-```
-> ls
+	``` bash
+	> ls
 
-> ls team:name-of-team name:name-of-project category:name-of-category
+	> ls team:name-of-team name:name-of-project category:name-of-category
 
-# NOTE: name can be partial name
-> ls team:^start-part-name-of-team  name:end-part-name-of-project$
+	# NOTE: name can be partial name
+	> ls team:^start-part-name-of-team  name:end-part-name-of-project$
 
-> ls team:all
+	> ls team:all
 
---short command pattern
-> ls name-or-number-of-project
-```
-You can set your default teams in gf.exe.config file, that only the projects owned by the teams will be listed.
+	--short command pattern
+	> ls name-or-number-of-project
+	```
 
-![list projects](https://github.com/sw0/GoFaster/blob/dev/manual-gifs/gf-001-ls.gif?raw=true)
+    You can set your default teams in gf.exe.config file, that only the projects owned by the teams will be listed.
+
+    <details>
+	  <summary>demonstration video for `list` (or `ls`) command (Click to expand)</summary>
+	  <img src="https://github.com/sw0/GoFaster/blob/dev/manual-gifs/gf-001-ls.gif?raw=true"/>
+	</details>
 
 ## Sync code from Perforce
-![sync code from Perfoce](https://github.com/sw0/GoFaster/blob/dev/manual-gifs/gf-002-sync.gif?raw=true)
+Synchronize the code from source control server, here it's Perforce.
+
+**Example**
+	``` bash
+	> sync 1   #sync the code for project with number 1
+
+	> sync HelloWorld  b:int  # sync the code for 'integration' branch for project with name contains "helloworld"
+
+	> sync ^Hello --force #force sync the code for project with name starts with 'Hello'
+
+	> sync orld$ b:integration --force  #force sync the integration branch code for project with name ends with 'orld'
+
+	> sync ell b:offcycle
+
+	> sync ell b:off --force
+	```
+
+    <details>
+	  <summary>demonstration video for `sync` command (Click to expand)</summary>
+	  <img src="https://github.com/sw0/GoFaster/blob/dev/manual-gifs/gf-002-sync.gif?raw=true"/>
+	</details>
+
