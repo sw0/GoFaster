@@ -72,10 +72,10 @@ List the projects with your given options: team, project name, category. the nam
 
     You can set your default teams in gf.exe.config file, that only the projects owned by the teams will be listed.
 
-    <details>
-	  <summary>demonstration video for `list` (or `ls`) command (Click to expand)</summary>
-	  <img src="https://github.com/sw0/GoFaster/blob/dev/manual-gifs/gf-001-ls.gif?raw=true"/>
-	</details>
+<details>
+    <summary>Click to expanddemonstration video for `list` (or `ls`) command</summary>
+    <img src="https://github.com/sw0/GoFaster/blob/dev/manual-gifs/gf-001-ls.gif?raw=true"/>
+</details>
 
 ## Sync code from Perforce
 Synchronize the code from source control server, here it's Perforce.
@@ -95,8 +95,8 @@ Synchronize the code from source control server, here it's Perforce.
 	> sync ell b:off --force
 	```
 
-    <details>
-	  <summary>demonstration video for `sync` command (Click to expand)</summary>
-	  <img src="https://github.com/sw0/GoFaster/blob/dev/manual-gifs/gf-002-sync.gif?raw=true"/>
-	</details>
+<details>
+    <summary>Click to expand: demonstration video for `sync` command</summary>
+    <img src="https://github.com/sw0/GoFaster/blob/dev/manual-gifs/gf-002-sync.gif?raw=true"/>
+</details>
 
