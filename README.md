@@ -1,5 +1,5 @@
 # GoFaster
-GF (GoFaster) is a command line tool for daily work to sync code from perforce, open, build projects, etc. It's would be helpful in daily work and improve productivity.
+GF (GoFaster) is a command line tool for daily work to sync code from perforce, open, build projects, etc. It's would be helpful in daily work and improve productivity and also would be helpful tool for new members in your team.
 
 # Branch Description
 * dev: dev branch
@@ -26,30 +26,30 @@ After you download GF (GoFaster), before you run the GoFaster tool, you need to 
 2. Set default working branch name and all available branches
 
     2.1. **IMPORTANT:** about working branch, some comany may use "current", some may use "dev" or "development", please set it right according your case.
-	```
-		<!-- DefaultWorkingBranch -->
-		<add key="DefaultWorkingBranch" value="current" />
-	```
+```
+	<!-- DefaultWorkingBranch -->
+	<add key="DefaultWorkingBranch" value="current" />
+```
 
     2.2. **IMPORTANT:** Set `BranchRegexPattern` which will be used to replace the path for your projects/solution file.
-	``` xml
-		<!-- Very Important: -->
-		<add key="BranchRegexPattern" value="\\(current|offcycle|integration|production|trunk|release)\\" />
-	```
+``` xml
+	<!-- Very Important: -->
+	<add key="BranchRegexPattern" value="\\(current|offcycle|integration|production|trunk|release)\\" />
+```
 
 3. Set hosts repositories
 We commonly use server name for different services, and we use alias for server name, so the name would be same for different environments(DEV, INTEGRATION, QA, UAT, PRODUCTION). So hosts varies by environment. 
 If you are not the case, please ignore this part. 
 
 	**Dependence:** Perforce.
-	``` xml
-		<!--hosts repositories: name:p4path:environment-names-with-comma-->
-		<add key="HostsRepositories" value="
-			 default:\\SCM\Configs\HOSTS\:DEV-INT,DEV-INT2,QA-2,QA-3,QA-4,QA-5;
-			 repo1:\\REPO1\Utils\hosts\:DEV,INT,QA,UAT,PROD;
-			 repo2:\\REPO2\Utils\hosts\:DEV,INT,QA,STG;
-			 repo3:\\REPO3\Utils\hosts\:DEV,INT,QA,STG;" />
-	```
+``` xml
+	<!--hosts repositories: name:p4path:environment-names-with-comma-->
+	<add key="HostsRepositories" value="
+			default:\\SCM\Configs\HOSTS\:DEV-INT,DEV-INT2,QA-2,QA-3,QA-4,QA-5;
+			repo1:\\REPO1\Utils\hosts\:DEV,INT,QA,UAT,PROD;
+			repo2:\\REPO2\Utils\hosts\:DEV,INT,QA,STG;
+			repo3:\\REPO3\Utils\hosts\:DEV,INT,QA,STG;" />
+```
 4. Add your projects into profile.xml
 
 # Features
@@ -57,7 +57,7 @@ If you are not the case, please ignore this part.
 List the projects with your given options: team, project name, category. the name can be full name or partial name. So it will be really convenient for you to find projects if there are too many projects in your teams.
 
 **Examples**
-``` bash
+```bash
 > ls
 # list all projects filtered by dfault teams setting in configuration
 
@@ -115,6 +115,29 @@ Synchronize the code from source control server, here it's Perforce.
 > open ^Hello 
 > open orld$ b:int
 > open world b:integration  #open solution/project for 'integration' branch with name containing 'world'
+```
+
+## hosts
+We frequently to do these things:
+* open my hosts
+* change hosts to specific depot's specific environment, like REPO1's integrtion environment
+* find the IP for given hostname/alias
+* find the alias for given IP address
+
+**Examples**
+```
+> hosts
+> hosts set e[nv]|b[branch]:QA4 [for:repo2]
+> hosts set for:repo1,repo2,move e:dev merge:di
+> hosts restore; hosts find h[ost]:server1v3|IP e:qa for=repo1
+```
+
+## change session configurations
+We'l use `set option-key=option-value` to change the session configurations. Like branch, debug mode.
+```
+> set b:int
+> set b:integration
+> set --dbg
 ```
 
 ## folder:fld: open folder/get folder for given project
