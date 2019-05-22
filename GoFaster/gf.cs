@@ -22,9 +22,12 @@ namespace Slin.GoFaster
          * 0.4.0.0  process `CmdEntry`, introduce uuid, support > cmd {project}; TODO to support lscmd
          * 0.5.0.0  improvement and bug fixing
          * 1.0.0.0  require administrator priviliages by introducing app.manifest.
+         * 2.0.0.0  support searching in category, name with regular expression
+         * 2.0.0.1  support vs|vs{\d4} command to launch VS
+         * 2.0.0.2  support launch visual studio command: vscmd
          * */
         const string AppName = "GoFaster";
-        const string AppVersion = "1.0.0.0";
+        const string AppVersion = "2.0.0.2";
         private static string CmdRegularExpressionString;
         static Regex RegBranch;
         static readonly Regex RegArgs = new Regex(@"/?\b(?<optkey>[a-zA-Z]+)[\:|=](?<optval>[^""\s]+|""(?:[^""]+""))|-(?<optval>[a-zA-Z]+)\s+(?<optval>[^""\s]+|""(?:[^""]+)"")|--(?<optflag>[a-zA-Z]+)");
@@ -35,6 +38,8 @@ namespace Slin.GoFaster
         static readonly Regex _regP4Workspace = new Regex(@"^c:\\P4", RegexOptions.Compiled | RegexOptions.IgnoreCase);
         static readonly Regex _regP4Config = new Regex(@"REM\s+--START\s*P4(.+)REM --END P4 CONFIG--", RegexOptions.Compiled | RegexOptions.Singleline);
 
+        static List<string> VSExes = null;
+
         static string _workingBranch;
         static string DefaultWorkingBranch;
         static string _defaultTeams = string.Empty; //or "all"
@@ -42,7 +47,7 @@ namespace Slin.GoFaster
         static List<Project> CurrentProjects = new List<Project>();
         static List<CmdEntry> CmdEntries = new List<CmdEntry>();
 
-        static readonly string AllCommandNamesNoNeedProject = ",list,ls,lscmd,cmd,mmc,ping,eventviewer,notepad,notepad++,desc,describe,wiki,p4v,inetmgr,ssms,sql,postman,pm,iisreset,help,?,set,db,hosts,folder,fld,code,wcf,uuid,guid,donate,";
+        static readonly string AllCommandNamesNoNeedProject = ",list,ls,lscmd,cmd,mmc,ping,eventviewer,notepad,notepad++,desc,describe,wiki,p4v,inetmgr,ssms,sql,postman,pm,iisreset,help,?,set,db,hosts,folder,fld,code,wcf,uuid,guid,vs,donate,";
         const string FolderHost = @"C:\Windows\System32\drivers\etc\";
         internal static readonly Dictionary<string, string> KeyMapping = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         internal static readonly Dictionary<string, string> ValueMapping = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
@@ -73,13 +78,14 @@ namespace Slin.GoFaster
             + @"|^\s*(?<command>help\b|\?)\s*$"
             + @"|^\s*(?<command>mmc|eventviewer)\b\s*$"
             + @"|^\s*(?<command>uuid|guid)\b"
+            + @"|^\s*(?<command>vs\d{4}|vs|vscmd)\s*$"
             + @"|^\s*(?<command>donate)\b"
             + @"|^\s*(?<command>ping)\s+(?<action>.+)\s*$"  //action actually is IP or host name here
             + $@"|^\s*(?<command>hosts)\b(?:\s+(?<action>open|set|find|restore|fld|folder))?\s*"  //host, env, for:
             + @"|^\s*(?<command>db)\b(?:\s+(?<dbName>[-\w]+))?";  //set branch=int;
 
             _regAction = new Regex(CmdRegularExpressionString,
-                RegexOptions.Compiled | RegexOptions.IgnoreCase | RegexOptions.Multiline);
+                RegexOptions.Compiled | RegexOptions.Multiline | RegexOptions.IgnoreCase);
 
             InitParametersMappings();
         }
@@ -394,6 +400,26 @@ namespace Slin.GoFaster
             }
 
             #endregion
+
+            #region -- find all visual studio installed --
+            {
+                var vsBaseDir = @"C:\Program Files (x86)\Microsoft Visual Studio\";
+                var subDirs = Directory.GetDirectories(vsBaseDir, "20*");
+                var versions = new[] { "Enterprise", "Professional", "Community" };
+                //todo cache these exe locations
+                VSExes = subDirs.ToList().SelectMany(dir =>
+                {
+                    var exeList = new List<string>();
+                    foreach (var ver in versions)
+                    {
+                        var exefile = dir + $@"\{ver}\Common7\IDE\devenv.exe";
+                        if (File.Exists(exefile))
+                            exeList.Add(exefile);
+                    }
+                    return exeList;
+                }).ToList();
+            }
+            #endregion
         }
 
         private static void ListProjects(IDictionary<string, string> parameters)
@@ -406,22 +432,34 @@ namespace Slin.GoFaster
             owners = owners ?? new string[0];
             CurrentProjects = AllProjects.Where(p => owners.Length == 0
                || owners.Contains("all", StringComparer.OrdinalIgnoreCase)
-                //|| "all".Equals(owner, StringComparison.OrdinalIgnoreCase)
-                || owners.Any(owner => (owner.StartsWith("\"")) && owner.Equals(p.Owner.Trim(new[] { '"' }), StringComparison.OrdinalIgnoreCase))
-                || owners.Any(owner => p.Owner.IndexOf(owner, StringComparison.OrdinalIgnoreCase) >= 0)).ToList();
+                || owners.Any(owner => TryIsMatch(p.Owner, owner))).ToList();
 
             CurrentProjects = CurrentProjects.Where(p => string.IsNullOrEmpty(category)
-                || (!category.StartsWith("\"")) && p.Category.Split(_commaSpaceSeparater, StringSplitOptions.RemoveEmptyEntries).Any(c => category.Equals(c, StringComparison.OrdinalIgnoreCase))
-                || p.Category.Split(_commaSpaceSeparater, StringSplitOptions.RemoveEmptyEntries).Any(c => c.IndexOf(category, StringComparison.OrdinalIgnoreCase) >= 0)).ToList();
+                || p.Category.Split(_commaSpaceSeparater, StringSplitOptions.RemoveEmptyEntries)
+                    .Any(c => TryIsMatch(c, category, RegexOptions.IgnoreCase))).ToList();
 
             var list = CurrentProjects;
             if (!string.IsNullOrWhiteSpace(name))
-                list = list.Where(p => name == "*" || p.Name.IndexOf(name, StringComparison.OrdinalIgnoreCase) >= 0).ToList();
+            {
+                try
+                {
+                    list = list.Where(p => name == "*" || TryIsMatch(p.Name, name)).ToList();
+                }
+                catch (Exception ex)
+                {
+                    WriteLineIdt($"option name '{name}' is in bad format: {ex.Message}"); return;
+                }
+            }
 
             if (_enableLog)
                 Console.WriteLine($"AllProjects: {AllProjects.Count}, CurrentProjects: {CurrentProjects.Count}, list:  {list.Count}, owner: {String.Join(",", owners)}, category: {category}, name: {name}");
 
             var groups = list.GroupBy(item => item.Owner.ToUpper());
+            if (groups.Count() == 0 && !string.IsNullOrEmpty(name))
+            {
+                WriteLineIdt($"cannot find the project with name matching pattern '{name}'");
+                return;
+            }
 
             foreach (var g in groups.OrderBy(g => g.Key))
             {
@@ -498,10 +536,8 @@ namespace Slin.GoFaster
 
         static Project GetProj(string projName)
         {
-            var proj = CurrentProjects.FirstOrDefault<Project>(p => p.Name.Equals(projName, StringComparison.OrdinalIgnoreCase));
-
-            if (proj == null)
-                proj = CurrentProjects.FirstOrDefault(p => p.Name.IndexOf(projName, StringComparison.OrdinalIgnoreCase) != -1);
+            var proj = CurrentProjects.FirstOrDefault(p => p.Name.Equals(projName, StringComparison.OrdinalIgnoreCase))
+            ?? CurrentProjects.FirstOrDefault(p => TryIsMatch(p.Name, projName));
 
             return proj;
         }
@@ -533,7 +569,8 @@ namespace Slin.GoFaster
             }
 
             if (project == null
-                && AllCommandNamesNoNeedProject.IndexOf($",{command},", StringComparison.OrdinalIgnoreCase) == -1)
+                && (AllCommandNamesNoNeedProject.IndexOf($",{command},", StringComparison.OrdinalIgnoreCase) == -1
+                && !Regex.IsMatch(command, "^vs|vs\\d{4}$")))
             {
                 WriteLineIdt($"command '{command}' needs project name or number.{(string.IsNullOrEmpty(projNoOrName) ? "" : $" project with name '{projNoOrName}' not fould.")}");
                 return project;
@@ -659,6 +696,14 @@ namespace Slin.GoFaster
                     var guid = Guid.NewGuid().ToString();
                     Clipboard.SetText(guid); WriteLineIdt($"guid copied to clipboard: {guid}");
                 }
+                else if ("vscmd" == command)
+                {
+                    LaunchVSCmd(command, parameters);
+                }
+                else if (Regex.IsMatch(command, "^vs(?:\\d{4})?$"))
+                {
+                    LaunchVS(command, parameters);
+                }
                 else if ("donate" == command)
                 {
                     Process.Start(PPDonationLink);
@@ -688,6 +733,44 @@ namespace Slin.GoFaster
             }
 
             return project;
+        }
+
+        static void LaunchVSCmd(string command, Dictionary<string, string> parameters) {
+            //%comspec% /k "C:\Program Files (x86)\Microsoft Visual Studio\2017\Professional\Common7\Tools\VsDevCmd.bat"
+            var vsExe = VSExes.FirstOrDefault();
+            var cmdBat = string.Empty;
+            if (vsExe != null && File.Exists(cmdBat = vsExe.Replace("IDE\\devenv.exe", "Tools\\VsDevCmd.bat"))) {
+                var wd = Path.GetFullPath(vsExe).ToLower();
+                var p = new Process();
+                p.StartInfo.FileName = "cmd.exe";
+                p.StartInfo.WorkingDirectory = wd.Substring(0, wd.IndexOf("\\common"));
+                p.StartInfo.Arguments = $"/k \"{cmdBat}\"";
+                p.StartInfo.RedirectStandardOutput = false;
+                p.StartInfo.UseShellExecute = true;
+                p.StartInfo.CreateNoWindow = true;
+                p.Start();
+            }
+        }
+        static void LaunchVS(string command, Dictionary<string, string> parameters)
+        {
+            var verInCmd = (string)null;
+            var vsExe2Run = (string)null;
+            var givenVersionNotFound = command.Length == 6;
+            if (VSExes.Count > 0 && command.Length == 6
+                && VSExes.Any(s => s.Contains(verInCmd = command.Substring(2))))//contains vs version
+            {
+                vsExe2Run = VSExes.FirstOrDefault(s => s.Contains(verInCmd));
+                givenVersionNotFound = false;
+            }
+            vsExe2Run = vsExe2Run ?? VSExes.FirstOrDefault();
+            if (givenVersionNotFound || vsExe2Run == null)
+            {
+                Console.WriteLine("given version of VS not found");
+            }
+            if (!string.IsNullOrEmpty(vsExe2Run))
+            {
+                Process.Start(vsExe2Run);
+            }
         }
 
         static void ProcessHostsCmd(string action, Dictionary<string, string> parameters)
@@ -1035,7 +1118,7 @@ namespace Slin.GoFaster
                     return;
                 }
 
-                WriteIdt($"not found: {projectPath}");
+                WriteIdt($"file not found: {projectPath}");
                 if (Console.CursorLeft > 0 && Console.CursorLeft != Console.WindowWidth) Console.WriteLine();
                 WriteLineIdt("please sync the code firstly like 'sync <projNameOrNo> [b:integration]'.");
             }
@@ -1400,6 +1483,12 @@ namespace Slin.GoFaster
             }
 
             return dic;
+        }
+
+        static bool TryIsMatch(string input, string pattern, RegexOptions option = RegexOptions.IgnoreCase)
+        {
+            try { return Regex.IsMatch(input, pattern, option); } catch { }
+            return false;
         }
 
         static void WriteLine(string msg = null)
