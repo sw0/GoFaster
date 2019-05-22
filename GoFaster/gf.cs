@@ -25,6 +25,7 @@ namespace Slin.GoFaster
          * 2.0.0.0  support searching in category, name with regular expression
          * 2.0.0.1  support vs|vs{\d4} command to launch VS
          * 2.0.0.2  support launch visual studio command: vscmd
+         * 2.0.2.0  support to set default wiki url in configuration
          * */
         const string AppName = "GoFaster";
         const string AppVersion = "2.0.0.2";
@@ -597,8 +598,7 @@ namespace Slin.GoFaster
                 }
                 else if (command.Equals("wiki", StringComparison.OrdinalIgnoreCase))
                 {
-                    if (project != null) OpenWiki(project);
-                    else Process.Start("https://github.com/sw0/GoFaster/blob/master/README.md");
+                    OpenWiki(project, parameters);
                 }
                 else if (command.Equals("p4v", StringComparison.OrdinalIgnoreCase))
                 {
@@ -1102,7 +1102,7 @@ namespace Slin.GoFaster
         {
             if (parameters.ContainsKey("for") && "wiki".Equals(parameters["for"].ToLower()))
             {
-                OpenWiki(proj);
+                OpenWiki(proj, parameters);
             }
             else if (parameters.ContainsKey("for") && "url".Equals(parameters["for"].ToLower()))
             {
@@ -1134,8 +1134,16 @@ namespace Slin.GoFaster
             if (!string.IsNullOrEmpty(url)) Process.Start(url);
             else WriteLineIdt($"url or endpoints is/are not set for the project: {project?.Name}");
         }
-        private static void OpenWiki(Project project)
+        private static void OpenWiki(Project project, Dictionary<string, string> parameters)
         {
+            if (project == null)
+            {
+                var wikiUrl = ConfigurationManager.AppSettings["defaultWiki"]?.Trim();
+                wikiUrl = string.IsNullOrWhiteSpace(wikiUrl) ? "https://github.com/sw0/GoFaster/blob/master/README.md" : wikiUrl;
+                Process.Start(wikiUrl);
+                return;
+            }
+
             var url = project.Wiki;
             if (!string.IsNullOrEmpty(url)) Process.Start(url);
             else WriteLineIdt($"wiki page is not set for the project: {project?.Name}");
