@@ -26,6 +26,7 @@ namespace Slin.GoFaster
          * 2.0.0.1  support vs|vs{\d4} command to launch VS
          * 2.0.0.2  support launch visual studio command: vscmd
          * 2.0.2.0  support to set default wiki url in configuration
+         * 2.0.3.0  support pattern for name in sync,bld,fld and other commands
          * */
         const string AppName = "GoFaster";
         const string AppVersion = "2.0.0.2";
@@ -73,7 +74,7 @@ namespace Slin.GoFaster
 
         static Program()
         {
-            CmdRegularExpressionString = $@"^\s*(?<command>sync|open|bld|build|start|folder|fld|code|url|wiki|cmd|desc|describe)\b(?:\s+(?<projNoOrName>[\._\w]+))?"
+            CmdRegularExpressionString = $@"^\s*(?<command>sync|open|bld|build|start|folder|fld|code|url|wiki|cmd|desc|describe)\b(?:\s+(?<projNoOrName>[\^?\._\w]+\$?))?"
             + $@"|^\s*(?<command>(?:list|ls|set)\b)\s*"  //e.g. list /team:team8 /name:coreapi /category:ecash
             + $@"|^\s*(?<command>notepad|notepad\+\+|p4v|inetmgr|ssms|sql|iisreset|vs\d{4}|wcf|postman|pm)\b\s*"
             + @"|^\s*(?<command>help\b|\?)\s*$"
@@ -573,7 +574,7 @@ namespace Slin.GoFaster
                 && (AllCommandNamesNoNeedProject.IndexOf($",{command},", StringComparison.OrdinalIgnoreCase) == -1
                 && !Regex.IsMatch(command, "^vs|vs\\d{4}$")))
             {
-                WriteLineIdt($"command '{command}' needs project name or number.{(string.IsNullOrEmpty(projNoOrName) ? "" : $" project with name '{projNoOrName}' not fould.")}");
+                WriteLineIdt($"command '{command}' needs project name or number.{(string.IsNullOrEmpty(projNoOrName) ? "" : $" but no project found with pattern '{projNoOrName}' for name.")}");
                 return project;
             }
 
