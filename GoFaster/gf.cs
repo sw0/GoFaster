@@ -29,7 +29,7 @@ namespace Slin.GoFaster
          * 2.0.3.0  support pattern for name in sync,bld,fld and other commands
          * */
         const string AppName = "GoFaster";
-        const string AppVersion = "2.0.0.2";
+        const string AppVersion = "2.0.3.0";
         private static string CmdRegularExpressionString;
         static Regex RegBranch;
         static readonly Regex RegArgs = new Regex(@"/?\b(?<optkey>[a-zA-Z]+)[\:|=](?<optval>[^""\s]+|""(?:[^""]+""))|-(?<optval>[a-zA-Z]+)\s+(?<optval>[^""\s]+|""(?:[^""]+)"")|--(?<optflag>[a-zA-Z]+)");
