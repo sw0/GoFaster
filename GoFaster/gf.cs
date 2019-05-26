@@ -27,6 +27,7 @@ namespace Slin.GoFaster
          * 2.0.0.2  support launch visual studio command: vscmd
          * 2.0.2.0  support to set default wiki url in configuration
          * 2.0.3.0  support pattern for name in sync,bld,fld and other commands
+         * 2.0.4.0  fix a bug in command 'code'
          * */
         const string AppName = "GoFaster";
         const string AppVersion = "2.0.3.0";
@@ -682,7 +683,7 @@ namespace Slin.GoFaster
                 }
                 else if (command.Equals("code", StringComparison.OrdinalIgnoreCase))
                 {
-                    CodeFolder(project, branchName);
+                    CodeFolder(project, projNoOrName, branchName);
                 }
                 else if (command.Equals("sync", StringComparison.OrdinalIgnoreCase))
                 {
@@ -736,11 +737,13 @@ namespace Slin.GoFaster
             return project;
         }
 
-        static void LaunchVSCmd(string command, Dictionary<string, string> parameters) {
+        static void LaunchVSCmd(string command, Dictionary<string, string> parameters)
+        {
             //%comspec% /k "C:\Program Files (x86)\Microsoft Visual Studio\2017\Professional\Common7\Tools\VsDevCmd.bat"
             var vsExe = VSExes.FirstOrDefault();
             var cmdBat = string.Empty;
-            if (vsExe != null && File.Exists(cmdBat = vsExe.Replace("IDE\\devenv.exe", "Tools\\VsDevCmd.bat"))) {
+            if (vsExe != null && File.Exists(cmdBat = vsExe.Replace("IDE\\devenv.exe", "Tools\\VsDevCmd.bat")))
+            {
                 var wd = Path.GetFullPath(vsExe).ToLower();
                 var p = new Process();
                 p.StartInfo.FileName = "cmd.exe";
@@ -1186,13 +1189,19 @@ namespace Slin.GoFaster
             }
         }
 
-        static void CodeFolder(Project proj, string branchName)
+        static void CodeFolder(Project proj, string projNameOrNo, string branchName)
         {
-            WriteLineIdt(proj.Path);
-            if (!string.IsNullOrWhiteSpace(proj.Path))
+            if (proj == null)
             {
+                if (!string.IsNullOrWhiteSpace(projNameOrNo)) WriteLineIdt($"starting VS Code, due to failed to find project with name matching '{projNameOrNo}'");
+                try { Process.Start("code"); } catch { }
+                return;
+            }
+            if (!string.IsNullOrWhiteSpace(proj?.Path))
+            {
+                //WriteLineIdt(proj.Path);
                 var path = Path.GetDirectoryName(GetBranchedPath(proj.Path, branchName));
-                WriteLineIdt($"Opening {path}");
+                WriteLineIdt($"starting VS Code: {path}");
                 var p = new Process { StartInfo = { FileName = "code", Arguments = path } };
                 p.Start();
             }
