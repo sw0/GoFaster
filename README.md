@@ -71,6 +71,13 @@ List the projects with your given options: team, project name, category. the nam
 
 --short command pattern
 > ls name-or-number-of-project
+
+> ls --teams
+# list all the team names set in profile.xml
+
+> ls --categories
+# list all the categories set in profile.xml
+
 ```
 
     You can set your default teams in gf.exe.config file, that only the projects owned by the teams will be listed.
