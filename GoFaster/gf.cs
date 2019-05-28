@@ -30,7 +30,7 @@ namespace Slin.GoFaster
          * 2.0.5.0  update message/hit for Code command; support `ls --teams` and `ls --categories`
          * */
         const string AppName = "GoFaster";
-        const string AppVersion = "2.0.5.0";
+        static string AppVersion { get => Assembly.GetEntryAssembly().GetName().Version.ToString(); }
         private static string CmdRegularExpressionString;
         static Regex RegBranch;
         static readonly Regex RegArgs = new Regex(@"/?\b(?<optkey>[a-zA-Z]+)[\:|=](?<optval>[^""\s]+|""(?:[^""]+""))|-(?<optval>[a-zA-Z]+)\s+(?<optval>[^""\s]+|""(?:[^""]+)"")|--(?<optflag>[a-zA-Z]+)");
