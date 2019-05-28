@@ -27,7 +27,7 @@ namespace Slin.GoFaster
          * 2.0.2.0  support to set default wiki url in configuration
          * 2.0.3.0  support pattern for name in sync,bld,fld and other commands
          * 2.0.4.0  fix a bug in command 'code'
-         * 2.0.5.0  update message/hit
+         * 2.0.5.0  update message/hit for Code command; support `ls --teams` and `ls --categories`
          * */
         const string AppName = "GoFaster";
         const string AppVersion = "2.0.5.0";
@@ -440,7 +440,7 @@ namespace Slin.GoFaster
             }
             #endregion
 
-            #region -- list teams --
+            #region -- list categories --
             if (parameters.ContainsKey("categories"))
             {
                 var allTeams = AllProjects.SelectMany(p => p.Category.ToUpper()
