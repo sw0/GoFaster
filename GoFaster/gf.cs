@@ -10,6 +10,23 @@ using System.Text.RegularExpressions;
 using System.Xml;
 using System.Xml.Linq;
 using System.Xml.Serialization;
+using System.Runtime.InteropServices;
+
+#region -- manifest --
+//MOVE manifest from Properties/AssemblyInfo.cs to make the code in single cs file, which I can easily use `csc` cmd
+[assembly: AssemblyTitle("GoFaster")]
+[assembly: AssemblyDescription("GoFaster is a command line tool that provide quick access to your trival items, which improve productivity in your daily work.")]
+[assembly: AssemblyConfiguration("")]
+[assembly: AssemblyCompany("Shawn Lin")]
+[assembly: AssemblyProduct("GoFaster")]
+[assembly: AssemblyCopyright("Copyright ©  2019  Shawn Lin: linsw@live.cn")]
+[assembly: AssemblyTrademark("GoFaster")]
+[assembly: AssemblyCulture("")]
+[assembly: ComVisible(false)]
+[assembly: Guid("f59a19b9-ce74-4731-8d19-cf0dd9cf5fb8")]
+[assembly: AssemblyVersion("2.0.5.0")]
+[assembly: AssemblyFileVersion("2.0.5.0")]
+#endregion
 
 namespace Slin.GoFaster
 {
@@ -30,7 +47,7 @@ namespace Slin.GoFaster
          * 2.0.5.0  update message/hit for Code command; support `ls --teams` and `ls --categories`
          * */
         const string AppName = "GoFaster";
-        const string AppVersion = "2.0.5.0";
+        static string AppVersion { get => Assembly.GetEntryAssembly().GetName().Version.ToString(); }
         private static string CmdRegularExpressionString;
         static Regex RegBranch;
         static readonly Regex RegArgs = new Regex(@"/?\b(?<optkey>[a-zA-Z]+)[\:|=](?<optval>[^""\s]+|""(?:[^""]+""))|-(?<optval>[a-zA-Z]+)\s+(?<optval>[^""\s]+|""(?:[^""]+)"")|--(?<optflag>[a-zA-Z]+)");
