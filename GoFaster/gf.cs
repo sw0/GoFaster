@@ -7,7 +7,6 @@ using System.Linq;
 using System.Reflection;
 using System.Text;
 using System.Text.RegularExpressions;
-using System.Windows.Forms;
 using System.Xml;
 using System.Xml.Linq;
 using System.Xml.Serialization;
@@ -428,6 +427,32 @@ namespace Slin.GoFaster
 
         private static void ListProjects(IDictionary<string, string> parameters)
         {
+            #region -- list teams --
+            if (parameters.ContainsKey("teams") || parameters.ContainsKey("owners"))
+            {
+                var allTeams = AllProjects.SelectMany(p => p.Owner.ToUpper()
+                    .Split(_commaSpaceSeparater, StringSplitOptions.RemoveEmptyEntries))
+                    .Distinct().OrderBy(s => s).ToList();
+
+                allTeams.ForEach(tn => WriteLineIdt($"team: {tn}"));
+
+                return;
+            }
+            #endregion
+
+            #region -- list teams --
+            if (parameters.ContainsKey("categories"))
+            {
+                var allTeams = AllProjects.SelectMany(p => p.Category.ToUpper()
+                    .Split(_commaSpaceSeparater, StringSplitOptions.RemoveEmptyEntries))
+                    .Distinct().OrderBy(s => s).ToList();
+
+                allTeams.ForEach(cate => WriteLineIdt($"category: {cate}"));
+
+                return;
+            }
+            #endregion
+
             var owners = (parameters.ContainsKey("team") ? parameters["team"] : _defaultTeams)
                 .Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
             var category = parameters.ContainsKey("category") ? parameters["category"] : null;
@@ -697,7 +722,7 @@ namespace Slin.GoFaster
                 else if ((new[] { "uuid", "guid" }).Contains(command))
                 {
                     var guid = Guid.NewGuid().ToString();
-                    Clipboard.SetText(guid); WriteLineIdt($"guid copied to clipboard: {guid}");
+                    System.Windows.Forms.Clipboard.SetText(guid); WriteLineIdt($"guid copied to clipboard: {guid}");
                 }
                 else if ("vscmd" == command)
                 {
@@ -940,7 +965,7 @@ namespace Slin.GoFaster
 
             if (parameters.ContainsKey("copy"))
             {
-                Clipboard.SetText(url);
+                System.Windows.Forms.Clipboard.SetText(url);
                 WriteLineIdt($"url copied to clipboard: {project?.Name}");
             }
             else
@@ -1177,7 +1202,7 @@ namespace Slin.GoFaster
             {
                 if (parameters != null && parameters.ContainsKey("copy"))
                 {
-                    Clipboard.SetText(path);
+                    System.Windows.Forms.Clipboard.SetText(path);
                     WriteLineIdt($"path copied to clipboard: {path}");
                     return;
                 }
