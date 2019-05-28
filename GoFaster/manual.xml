@@ -31,6 +31,12 @@
     </sample>
   </cmd>
   <cmd>
+    <command>VSCMD</command>
+    <sample>
+      <![CDATA[vscmd #launch Visual Studio Command Prompt]]>
+    </sample>
+  </cmd>
+  <cmd>
     <command>desc</command>
     <sample>
       <![CDATA[desc {{projectNameOrNo}} b[ranch]:{{branch abbr or name}} --force]]>
@@ -47,7 +53,8 @@
   <cmd>
     <command>ls,list</command>
     <sample>
-      <![CDATA[ls|list team:team8,alpha name:coreapi category:ecash]]>
+      <![CDATA[ls|list team:team8,alpha name:coreapi category:ecash
+      ls|list --teams   #list all team names;ls|list --categories #list all categories]]>
     </sample>
   </cmd>
   <cmd>

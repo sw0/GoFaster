@@ -7,7 +7,6 @@ using System.Linq;
 using System.Reflection;
 using System.Text;
 using System.Text.RegularExpressions;
-using System.Windows.Forms;
 using System.Xml;
 using System.Xml.Linq;
 using System.Xml.Serialization;
@@ -28,9 +27,10 @@ namespace Slin.GoFaster
          * 2.0.2.0  support to set default wiki url in configuration
          * 2.0.3.0  support pattern for name in sync,bld,fld and other commands
          * 2.0.4.0  fix a bug in command 'code'
+         * 2.0.5.0  update message/hit for Code command; support `ls --teams` and `ls --categories`
          * */
         const string AppName = "GoFaster";
-        const string AppVersion = "2.0.3.0";
+        const string AppVersion = "2.0.5.0";
         private static string CmdRegularExpressionString;
         static Regex RegBranch;
         static readonly Regex RegArgs = new Regex(@"/?\b(?<optkey>[a-zA-Z]+)[\:|=](?<optval>[^""\s]+|""(?:[^""]+""))|-(?<optval>[a-zA-Z]+)\s+(?<optval>[^""\s]+|""(?:[^""]+)"")|--(?<optflag>[a-zA-Z]+)");
@@ -148,7 +148,7 @@ namespace Slin.GoFaster
         STEP01:
             var old = Console.ForegroundColor;
             Console.ForegroundColor = ConsoleColor.DarkYellow;
-            Console.WriteLine("> 'sync|open|build|bld|desc|folder|fld|code|url <projNoOrName> [b:<branch>]';");
+            Console.WriteLine("> 'sync|open|build|bld|desc|folder|fld|code|url <projNoOrName> [b:<branch>] [--force]';");
             WriteLineIdt($"'hosts open/set [e[nv]:local|di|dev-int|qa4|qa3[-nonasm]|QA|STG] [for:default|repo1|repo2|move]'");
             WriteLineIdt($"'wiki|notepad(++)|p4v|inetmgr|ssms|sql|mmc|cmd|postman|pm|iisreset|list|ls|wcf' for help, run p4v, list projects");
             WriteLineIdt($"'?' or '<cmd> ?' for help. 'exit|quit|q|cls|clear' to quit/clear. Or try 'donate' if you like this tool :) Thanks!");
@@ -427,6 +427,32 @@ namespace Slin.GoFaster
 
         private static void ListProjects(IDictionary<string, string> parameters)
         {
+            #region -- list teams --
+            if (parameters.ContainsKey("teams") || parameters.ContainsKey("owners"))
+            {
+                var allTeams = AllProjects.SelectMany(p => p.Owner.ToUpper()
+                    .Split(_commaSpaceSeparater, StringSplitOptions.RemoveEmptyEntries))
+                    .Distinct().OrderBy(s => s).ToList();
+
+                allTeams.ForEach(tn => WriteLineIdt($"team: {tn}"));
+
+                return;
+            }
+            #endregion
+
+            #region -- list categories --
+            if (parameters.ContainsKey("categories"))
+            {
+                var allTeams = AllProjects.SelectMany(p => p.Category.ToUpper()
+                    .Split(_commaSpaceSeparater, StringSplitOptions.RemoveEmptyEntries))
+                    .Distinct().OrderBy(s => s).ToList();
+
+                allTeams.ForEach(cate => WriteLineIdt($"category: {cate}"));
+
+                return;
+            }
+            #endregion
+
             var owners = (parameters.ContainsKey("team") ? parameters["team"] : _defaultTeams)
                 .Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
             var category = parameters.ContainsKey("category") ? parameters["category"] : null;
@@ -696,7 +722,7 @@ namespace Slin.GoFaster
                 else if ((new[] { "uuid", "guid" }).Contains(command))
                 {
                     var guid = Guid.NewGuid().ToString();
-                    Clipboard.SetText(guid); WriteLineIdt($"guid copied to clipboard: {guid}");
+                    System.Windows.Forms.Clipboard.SetText(guid); WriteLineIdt($"guid copied to clipboard: {guid}");
                 }
                 else if ("vscmd" == command)
                 {
@@ -939,7 +965,7 @@ namespace Slin.GoFaster
 
             if (parameters.ContainsKey("copy"))
             {
-                Clipboard.SetText(url);
+                System.Windows.Forms.Clipboard.SetText(url);
                 WriteLineIdt($"url copied to clipboard: {project?.Name}");
             }
             else
@@ -1176,7 +1202,7 @@ namespace Slin.GoFaster
             {
                 if (parameters != null && parameters.ContainsKey("copy"))
                 {
-                    Clipboard.SetText(path);
+                    System.Windows.Forms.Clipboard.SetText(path);
                     WriteLineIdt($"path copied to clipboard: {path}");
                     return;
                 }
@@ -1193,21 +1219,36 @@ namespace Slin.GoFaster
         {
             if (proj == null)
             {
-                if (!string.IsNullOrWhiteSpace(projNameOrNo)) WriteLineIdt($"starting VS Code, due to failed to find project with name matching '{projNameOrNo}'");
-                try { Process.Start("code"); } catch { }
-                return;
+                if (!string.IsNullOrWhiteSpace(projNameOrNo))
+                {
+                    WriteLineIdt($"failed to find project with name or number matching '{projNameOrNo}'");
+                    return;
+                }
+                StartVSCode(null); return;
             }
+
             if (!string.IsNullOrWhiteSpace(proj?.Path))
             {
-                //WriteLineIdt(proj.Path);
                 var path = Path.GetDirectoryName(GetBranchedPath(proj.Path, branchName));
-                WriteLineIdt($"starting VS Code: {path}");
-                var p = new Process { StartInfo = { FileName = "code", Arguments = path } };
-                p.Start();
+                StartVSCode(path);
             }
             else
             {
                 WriteLineIdt($"the solution/project path was not set for Project '{proj.Name}'");
+            }
+        }
+
+        static void StartVSCode(string path)
+        {
+            try
+            {
+                var p = new Process { StartInfo = { FileName = "code", Arguments = path } };
+                p.Start();
+                WriteLineIdtIf(!string.IsNullOrEmpty(path), $"starting VS Code: {path}");
+            }
+            catch
+            {
+                WriteLineIdt($"error occurred when starting VS Code, pls make sure you get VS Code installed.");
             }
         }
 
