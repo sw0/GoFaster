@@ -28,6 +28,7 @@ namespace Slin.GoFaster
          * 2.0.3.0  support pattern for name in sync,bld,fld and other commands
          * 2.0.4.0  fix a bug in command 'code'
          * 2.0.5.0  update message/hit for Code command; support `ls --teams` and `ls --categories`
+         * 2.0.7.0  support profile-custom.xml
          * */
         const string AppName = "GoFaster";
         static string AppVersion { get => Assembly.GetEntryAssembly().GetName().Version.ToString(); }
@@ -62,6 +63,7 @@ namespace Slin.GoFaster
         private static string CurrentCommand;
         const int ColumnSize = 36;  // Console.WindowSize / _columnSize to get the column count
         const string ProfileFileName = "profile.xml";
+        const string PrivateProfileFileName = "profile-custom.xml";
         const string SyncCfgFileName = "sync_cfg.cmd";
         const string SyncCmdSampleFileName = "sync_sample.txt";
         const string SyncCmdFileName = "sync.cmd";
@@ -1367,33 +1369,12 @@ namespace Slin.GoFaster
         }
         #endregion
 
-        static Profile GetProfile()
+        static Profile GetProfile(bool mergePrviate = true)
         {
+            Profile profile = null;
             try
             {
-                var profile = Deserialize<Profile>(ProfileFileName);
-                profile?.Projects?.ForEach((p) =>
-                {
-                    if (p.Path?.Length > 0 && !p.Path.StartsWith(_p4Workspace, StringComparison.OrdinalIgnoreCase))
-                    {
-                        p.Path = _regP4Workspace.Replace(p.Path, _p4Workspace);
-                    }
-                    if (p.Entry?.Length > 0 && !p.Entry.StartsWith(_p4Workspace, StringComparison.OrdinalIgnoreCase))
-                    {
-                        p.Entry = _regP4Workspace.Replace(p.Entry, _p4Workspace);
-                    }
-                    p.Owner = p.Owner ?? string.Empty;
-                    p.Category = p.Category ?? string.Empty;
-                    p.Path = p.Path ?? string.Empty;
-                    p.Entry = p.Entry ?? string.Empty;
-                });
-                if (profile != null && profile.Projects != null)
-                {
-                    var projects = profile.Projects;
-                    for (var i = 1; i <= projects.Count; i++) projects[i - 1].Index = i;
-                }
-
-                return profile;
+                profile = Deserialize<Profile>(ProfileFileName);
             }
             catch (Exception ex)
             {
@@ -1401,6 +1382,49 @@ namespace Slin.GoFaster
                 WriteLineIdt(ex.Message);
                 throw;
             }
+
+            try
+            {
+                if (File.Exists(PrivateProfileFileName))
+                {
+                    var privateProfile = Deserialize<Profile>(PrivateProfileFileName);
+
+                    profile.CmdEntries.AddRange(privateProfile.CmdEntries
+                        .Where(c => false == profile.CmdEntries.Any(ce => ce.CmdName != null
+                        && ce.CmdName.Equals(c.CmdName, StringComparison.OrdinalIgnoreCase))));
+
+                    profile.Projects.AddRange(privateProfile.Projects);
+                }
+            }
+            catch (Exception ex)
+            {
+                WriteLineIdt("error occurred when loading private profile file:");
+                WriteLineIdt(ex.Message);
+                throw;
+            }
+
+            profile?.Projects?.ForEach((p) =>
+            {
+                if (p.Path?.Length > 0 && !p.Path.StartsWith(_p4Workspace, StringComparison.OrdinalIgnoreCase))
+                {
+                    p.Path = _regP4Workspace.Replace(p.Path, _p4Workspace);
+                }
+                if (p.Entry?.Length > 0 && !p.Entry.StartsWith(_p4Workspace, StringComparison.OrdinalIgnoreCase))
+                {
+                    p.Entry = _regP4Workspace.Replace(p.Entry, _p4Workspace);
+                }
+                p.Owner = p.Owner ?? string.Empty;
+                p.Category = p.Category ?? string.Empty;
+                p.Path = p.Path ?? string.Empty;
+                p.Entry = p.Entry ?? string.Empty;
+            });
+            if (profile != null && profile.Projects != null)
+            {
+                var projects = profile.Projects;
+                for (var i = 1; i <= projects.Count; i++) projects[i - 1].Index = i;
+            }
+
+            return profile;
         }
         static List<Project> GetProjects()
         {
