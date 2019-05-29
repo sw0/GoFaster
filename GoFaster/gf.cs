@@ -78,7 +78,7 @@ namespace Slin.GoFaster
         static Program()
         {
             CmdRegularExpressionString = $@"^\s*(?<command>sync|open|bld|build|start|folder|fld|code|url|wiki|cmd|desc|describe)\b(?:\s+(?<projNoOrName>[\^?\._\w]+\$?))?"
-            + $@"|^\s*(?<command>(?:list|ls|set)\b)\s*"  //e.g. list /team:team8 /name:coreapi /category:ecash
+            + $@"|^\s*(?<command>(?:lscmd|list|ls|set)\b)\s*"  //e.g. list /team:team8 /name:coreapi /category:ecash
             + $@"|^\s*(?<command>notepad|notepad\+\+|p4v|inetmgr|ssms|sql|iisreset|vs\d{4}|wcf|postman|pm)\b\s*"
             + @"|^\s*(?<command>help\b|\?)\s*$"
             + @"|^\s*(?<command>mmc|eventviewer)\b\s*$"
@@ -512,6 +512,16 @@ namespace Slin.GoFaster
             Console.WriteLine();
         }
 
+        static void ListCustomCommands(Dictionary<string, string> parameters) {
+            CmdEntries.ForEach(ce => {
+                var line = $"* {ce.CmdName} {ce.CmdArgs}".PadRight(ColumnSize).Substring(0, ColumnSize);
+                WriteLineIdt(line);
+
+                if (Console.WindowWidth - Console.CursorLeft < ColumnSize)
+                    Console.WriteLine();
+            });
+        }
+
         #region Console Help Methods
         public static void ClearCurrentConsoleLine()
         {
@@ -692,6 +702,10 @@ namespace Slin.GoFaster
                 else if (",list,ls,".Contains(string.Concat(",", command, ",")))
                 {
                     ListProjects(parameters);
+                }
+                else if (",lscmd,".Contains(string.Concat(",", command, ",")))
+                {
+                    ListCustomCommands(parameters);
                 }
                 else if (command.Equals("set", StringComparison.OrdinalIgnoreCase))
                 {
