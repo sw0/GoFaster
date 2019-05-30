@@ -28,6 +28,7 @@ namespace Slin.GoFaster
          * 2.0.3.0  support pattern for name in sync,bld,fld and other commands
          * 2.0.4.0  fix a bug in command 'code'
          * 2.0.5.0  update message/hit for Code command; support `ls --teams` and `ls --categories`
+         * 2.0.7.0  support profile-custom.xml and support `lscmd`
          * */
         const string AppName = "GoFaster";
         static string AppVersion { get => Assembly.GetEntryAssembly().GetName().Version.ToString(); }
@@ -62,6 +63,7 @@ namespace Slin.GoFaster
         private static string CurrentCommand;
         const int ColumnSize = 36;  // Console.WindowSize / _columnSize to get the column count
         const string ProfileFileName = "profile.xml";
+        const string PrivateProfileFileName = "profile-custom.xml";
         const string SyncCfgFileName = "sync_cfg.cmd";
         const string SyncCmdSampleFileName = "sync_sample.txt";
         const string SyncCmdFileName = "sync.cmd";
@@ -76,7 +78,7 @@ namespace Slin.GoFaster
         static Program()
         {
             CmdRegularExpressionString = $@"^\s*(?<command>sync|open|bld|build|start|folder|fld|code|url|wiki|cmd|desc|describe)\b(?:\s+(?<projNoOrName>[\^?\._\w]+\$?))?"
-            + $@"|^\s*(?<command>(?:list|ls|set)\b)\s*"  //e.g. list /team:team8 /name:coreapi /category:ecash
+            + $@"|^\s*(?<command>(?:lscmd|list|ls|set)\b)\s*"  //e.g. list /team:team8 /name:coreapi /category:ecash
             + $@"|^\s*(?<command>notepad|notepad\+\+|p4v|inetmgr|ssms|sql|iisreset|vs\d{4}|wcf|postman|pm)\b\s*"
             + @"|^\s*(?<command>help\b|\?)\s*$"
             + @"|^\s*(?<command>mmc|eventviewer)\b\s*$"
@@ -510,6 +512,16 @@ namespace Slin.GoFaster
             Console.WriteLine();
         }
 
+        static void ListCustomCommands(Dictionary<string, string> parameters) {
+            CmdEntries.ForEach(ce => {
+                var line = $"* {ce.CmdName} {ce.CmdArgs}".PadRight(ColumnSize).Substring(0, ColumnSize);
+                WriteLineIdt(line);
+
+                if (Console.WindowWidth - Console.CursorLeft < ColumnSize)
+                    Console.WriteLine();
+            });
+        }
+
         #region Console Help Methods
         public static void ClearCurrentConsoleLine()
         {
@@ -690,6 +702,10 @@ namespace Slin.GoFaster
                 else if (",list,ls,".Contains(string.Concat(",", command, ",")))
                 {
                     ListProjects(parameters);
+                }
+                else if (",lscmd,".Contains(string.Concat(",", command, ",")))
+                {
+                    ListCustomCommands(parameters);
                 }
                 else if (command.Equals("set", StringComparison.OrdinalIgnoreCase))
                 {
@@ -1367,33 +1383,12 @@ namespace Slin.GoFaster
         }
         #endregion
 
-        static Profile GetProfile()
+        static Profile GetProfile(bool mergePrviate = true)
         {
+            Profile profile = null;
             try
             {
-                var profile = Deserialize<Profile>(ProfileFileName);
-                profile?.Projects?.ForEach((p) =>
-                {
-                    if (p.Path?.Length > 0 && !p.Path.StartsWith(_p4Workspace, StringComparison.OrdinalIgnoreCase))
-                    {
-                        p.Path = _regP4Workspace.Replace(p.Path, _p4Workspace);
-                    }
-                    if (p.Entry?.Length > 0 && !p.Entry.StartsWith(_p4Workspace, StringComparison.OrdinalIgnoreCase))
-                    {
-                        p.Entry = _regP4Workspace.Replace(p.Entry, _p4Workspace);
-                    }
-                    p.Owner = p.Owner ?? string.Empty;
-                    p.Category = p.Category ?? string.Empty;
-                    p.Path = p.Path ?? string.Empty;
-                    p.Entry = p.Entry ?? string.Empty;
-                });
-                if (profile != null && profile.Projects != null)
-                {
-                    var projects = profile.Projects;
-                    for (var i = 1; i <= projects.Count; i++) projects[i - 1].Index = i;
-                }
-
-                return profile;
+                profile = Deserialize<Profile>(ProfileFileName);
             }
             catch (Exception ex)
             {
@@ -1401,6 +1396,49 @@ namespace Slin.GoFaster
                 WriteLineIdt(ex.Message);
                 throw;
             }
+
+            try
+            {
+                if (File.Exists(PrivateProfileFileName))
+                {
+                    var privateProfile = Deserialize<Profile>(PrivateProfileFileName);
+
+                    profile.CmdEntries.AddRange(privateProfile.CmdEntries
+                        .Where(c => false == profile.CmdEntries.Any(ce => ce.CmdName != null
+                        && ce.CmdName.Equals(c.CmdName, StringComparison.OrdinalIgnoreCase))));
+
+                    profile.Projects.AddRange(privateProfile.Projects);
+                }
+            }
+            catch (Exception ex)
+            {
+                WriteLineIdt("error occurred when loading private profile file:");
+                WriteLineIdt(ex.Message);
+                throw;
+            }
+
+            profile?.Projects?.ForEach((p) =>
+            {
+                if (p.Path?.Length > 0 && !p.Path.StartsWith(_p4Workspace, StringComparison.OrdinalIgnoreCase))
+                {
+                    p.Path = _regP4Workspace.Replace(p.Path, _p4Workspace);
+                }
+                if (p.Entry?.Length > 0 && !p.Entry.StartsWith(_p4Workspace, StringComparison.OrdinalIgnoreCase))
+                {
+                    p.Entry = _regP4Workspace.Replace(p.Entry, _p4Workspace);
+                }
+                p.Owner = p.Owner ?? string.Empty;
+                p.Category = p.Category ?? string.Empty;
+                p.Path = p.Path ?? string.Empty;
+                p.Entry = p.Entry ?? string.Empty;
+            });
+            if (profile != null && profile.Projects != null)
+            {
+                var projects = profile.Projects;
+                for (var i = 1; i <= projects.Count; i++) projects[i - 1].Index = i;
+            }
+
+            return profile;
         }
         static List<Project> GetProjects()
         {
@@ -1677,10 +1715,20 @@ namespace Slin.GoFaster
         public string Type { get; set; } = "Default";
     }
 
+
+    public enum CmdTargetType
+    {
+        Command, //TODO does powershell supported?
+        ApplicationOrUrl,        
+    }
+
     public class CmdEntry
     {
         [XmlAttribute]
         public string CmdName { get; set; }
+        [XmlAttribute]
+        public string ShortCmdNames { get; set; }
+        public CmdTargetType TargetType { get; set; } 
         [XmlAttribute]
         public string Owner { get; set; }
         public string Process { get; set; }
