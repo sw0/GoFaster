@@ -409,6 +409,13 @@ namespace Slin.GoFaster
 
             #region -- find all visual studio installed --
             {
+                //TODO other folders like: 
+                //C:\Program Files (x86)\Microsoft Visual Studio 9.0\    //2008
+                //C:\Program Files (x86)\Microsoft Visual Studio 10.0\   //2010
+                //C:\Program Files (x86)\Microsoft Visual Studio 11.0\
+                //C:\Program Files (x86)\Microsoft Visual Studio 12.0\  
+                //C:\Program Files (x86)\Microsoft Visual Studio 14.0\Common7\IDE\devenv.exe  //2015
+
                 var vsBaseDir = @"C:\Program Files (x86)\Microsoft Visual Studio\";
                 var subDirs = Directory.GetDirectories(vsBaseDir, "20*");
                 var versions = new[] { "Enterprise", "Professional", "Community" };
@@ -424,6 +431,16 @@ namespace Slin.GoFaster
                     }
                     return exeList;
                 }).ToList();
+
+                var legacyVS = new[] { "9.0", "10.0", "11.0", "12.0", "14.0" };
+                foreach (var v in legacyVS)
+                {
+                    var file = $"C:\\Program Files (x86)\\Microsoft Visual Studio {v}\\Common7\\IDE\\devenv.exe";
+                    if (File.Exists(file))
+                    {
+                        VSExes.Add(file);
+                    }
+                }
             }
             #endregion
         }
@@ -802,18 +819,23 @@ namespace Slin.GoFaster
         static void LaunchVS(string command, Dictionary<string, string> parameters)
         {
             var verInCmd = (string)null;
+            var legacyVer = (string)null;
             var vsExe2Run = (string)null;
+            if (command.EndsWith("2015")) legacyVer = " 14.0";
+            if (command.EndsWith("2010")) legacyVer = " 10.0";
+            if (command.EndsWith("2008")) legacyVer = " 9.0";
             var givenVersionNotFound = command.Length == 6;
             if (VSExes.Count > 0 && command.Length == 6
-                && VSExes.Any(s => s.Contains(verInCmd = command.Substring(2))))//contains vs version
+                && VSExes.Any(s => s.Contains(verInCmd = command.Substring(2))
+                 || s.Contains(legacyVer ?? "just-place-holder-expect-not-found")))//contains vs version
             {
-                vsExe2Run = VSExes.FirstOrDefault(s => s.Contains(verInCmd));
+                vsExe2Run = VSExes.FirstOrDefault(s => s.Contains(verInCmd) || s.Contains(legacyVer ?? "just-place-holder-expect-not-found"));
                 givenVersionNotFound = false;
             }
             vsExe2Run = vsExe2Run ?? VSExes.FirstOrDefault();
             if (givenVersionNotFound || vsExe2Run == null)
             {
-                Console.WriteLine("given version of VS not found");
+                WriteLineIdt("given version of VS not found"); return;
             }
             if (!string.IsNullOrEmpty(vsExe2Run))
             {
