@@ -70,6 +70,12 @@
     </sample>
   </cmd>
   <cmd>
+    <command>swagger</command>
+    <sample>
+      <![CDATA[swagger 31; swag PinService]]>
+    </sample>
+  </cmd>
+  <cmd>
     <command>fld,folder</command>
     <sample>
       <![CDATA[fld|folder [projectNameOrNo] --[cp|copy]]]>
