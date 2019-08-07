@@ -78,7 +78,7 @@ namespace Slin.GoFaster
 
         static Program()
         {
-            CmdRegularExpressionString = $@"^\s*(?<command>sync|open|bld|build|start|folder|fld|code|url|swagger|swag|wiki|cmd|desc|describe)\b(?:\s+(?<projNoOrName>[\^?\._\w]+\$?))?"
+            CmdRegularExpressionString = $@"^\s*(?<command>sync|open|bld|build|start|folder|fld|code|url|swagger|swag|teamcity|tc|wiki|cmd|desc|describe)\b(?:\s+(?<projNoOrName>[\^?\._\w]+\$?))?"
             + $@"|^\s*(?<command>(?:lscmd|list|ls|set)\b)\s*"  //e.g. list /team:team8 /name:coreapi /category:ecash
             + $@"|^\s*(?<command>notepad|notepad\+\+|p4v|inetmgr|ssms|sql|iisreset|vs\d{4}|wcf|postman|pm)\b\s*"
             + @"|^\s*(?<command>help\b|\?)\s*$"
@@ -749,9 +749,10 @@ namespace Slin.GoFaster
                 {
                     Sync(project, branchName, parameters.ContainsKey("f") || parameters.ContainsKey("force"));
                 }
-                else if ((new[] { "url", "swagger", "swag"}).Contains(command))
+                else if ((new[] { "url", "swagger", "swag", "teamcity", "tc"}).Contains(command))
                 {
                     if (command.StartsWith("swag")) { command = "url"; parameters["type"] = "swagger"; }
+                    if (command == "tc" || command == "teamcity") { command = "teamcity"; parameters["type"] = "teamcity"; }
                     ProcessUrlCmd(project, parameters);
                 }
                 else if ((new[] { "uuid", "guid" }).Contains(command))

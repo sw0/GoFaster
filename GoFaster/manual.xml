@@ -70,9 +70,15 @@
     </sample>
   </cmd>
   <cmd>
-    <command>swagger</command>
+    <command>swagger|swag</command>
     <sample>
       <![CDATA[swagger 31; swag PinService]]>
+    </sample>
+  </cmd>
+  <cmd>
+    <command>teamcity|tc</command>
+    <sample>
+      <![CDATA[teamcity [31]; tc CoreApi]]>
     </sample>
   </cmd>
   <cmd>
