@@ -1724,7 +1724,7 @@ namespace Slin.GoFaster
             var endpoints = this.Endpoints?.Where(end => !string.IsNullOrEmpty(end.Url));
             var urls = string.Join("\r\n\t", endpoints.Select(end => end.Url).ToList());
 
-            return $@"{Name}({Category}) | {Owner} | {Url ?? endpoints?.FirstOrDefault()?.Url}
+            return $@"#{Index} {Name}({Category}) | {Owner} | {Url ?? endpoints?.FirstOrDefault()?.Url}
   {solution}
   {entry}
   {urls}
