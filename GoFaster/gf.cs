@@ -30,6 +30,8 @@ namespace Slin.GoFaster
          * 2.0.5.0  update message/hit for Code command; support `ls --teams` and `ls --categories`
          * 2.0.7.0  support profile-custom.xml and support `lscmd`
          * 2.0.8.0  `swagger` or `swag`
+         * 2.0.9.0  hosts [find] [host]
+         *          allow "-" in projNoOrName
          * */
         const string AppName = "GoFaster";
         static string AppVersion { get => Assembly.GetEntryAssembly().GetName().Version.ToString(); }
@@ -78,7 +80,7 @@ namespace Slin.GoFaster
 
         static Program()
         {
-            CmdRegularExpressionString = $@"^\s*(?<command>sync|open|bld|build|start|folder|fld|code|url|swagger|swag|teamcity|tc|wiki|cmd|desc|describe)\b(?:\s+(?<projNoOrName>[\^?\._\w]+\$?))?"
+            CmdRegularExpressionString = $@"^\s*(?<command>sync|open|bld|build|start|folder|fld|code|url|swagger|swag|teamcity|tc|wiki|cmd|desc|describe)\b(?:\s+(?<projNoOrName>[\^?\._\w]+(?:-[\._\w]+)*\$?))?"
             + $@"|^\s*(?<command>(?:lscmd|list|ls|set)\b)\s*"  //e.g. list /team:team8 /name:coreapi /category:ecash
             + $@"|^\s*(?<command>notepad|notepad\+\+|p4v|inetmgr|ssms|sql|iisreset|vs\d{4}|wcf|postman|pm)\b\s*"
             + @"|^\s*(?<command>help\b|\?)\s*$"
@@ -87,7 +89,7 @@ namespace Slin.GoFaster
             + @"|^\s*(?<command>vs\d{4}|vs|vscmd)\s*$"
             + @"|^\s*(?<command>donate)\b"
             + @"|^\s*(?<command>ping)\s+(?<action>.+)\s*$"  //action actually is IP or host name here
-            + $@"|^\s*(?<command>hosts)\b(?:\s+(?<action>open|set|find|restore|fld|folder))?\s*"  //host, env, for:
+            + $@"|^\s*(?<command>hosts)\b(?:\s+(?<action>open|set|find|restore|fld|folder|[^\s\t]+))?\s*"  //host, env, for:
             + @"|^\s*(?<command>db)\b(?:\s+(?<dbName>[-\w]+))?";  //set branch=int;
 
             _regAction = new Regex(CmdRegularExpressionString,
@@ -530,8 +532,10 @@ namespace Slin.GoFaster
             Console.WriteLine();
         }
 
-        static void ListCustomCommands(Dictionary<string, string> parameters) {
-            CmdEntries.ForEach(ce => {
+        static void ListCustomCommands(Dictionary<string, string> parameters)
+        {
+            CmdEntries.ForEach(ce =>
+            {
                 var line = $"* {ce.CmdName} {ce.CmdArgs}".PadRight(ColumnSize).Substring(0, ColumnSize);
                 WriteLineIdt(line);
 
@@ -749,7 +753,7 @@ namespace Slin.GoFaster
                 {
                     Sync(project, branchName, parameters.ContainsKey("f") || parameters.ContainsKey("force"));
                 }
-                else if ((new[] { "url", "swagger", "swag", "teamcity", "tc"}).Contains(command))
+                else if ((new[] { "url", "swagger", "swag", "teamcity", "tc" }).Contains(command))
                 {
                     if (command.StartsWith("swag")) { command = "url"; parameters["type"] = "swagger"; }
                     if (command == "tc" || command == "teamcity") { command = "teamcity"; parameters["type"] = "teamcity"; }
@@ -873,6 +877,23 @@ namespace Slin.GoFaster
 
             if (action == "open" || action == "set" || action == "find" || action == "restore" || action == "fld" || action == "folder")
             {
+            }
+            else if (",qa,qa2,qa3,qa4,qa5,dev,di1,di2,di-1,di-2,pie,integration,".Contains(action)) {
+                env = action;
+                action = "open";
+            }
+            else if(!parameters.TryGetValue("host", out var host))
+            {
+                parameters.Add("host", action);
+                action = "find";
+            }
+            else
+            {
+                WriteLineIdt("not supported action for command 'hosts'");
+                return;
+            }
+
+            { 
                 var file = string.Empty;
                 if (!HostsRepositories.TryGetValue(dicKey, out file))
                 {
@@ -980,8 +1001,6 @@ namespace Slin.GoFaster
 
                 return;
             }
-
-            WriteLineIdt("not supported action for command 'hosts'");
         }
 
         static void ProcessUrlCmd(Project project, Dictionary<string, string> parameters)
@@ -1744,7 +1763,7 @@ namespace Slin.GoFaster
     public enum CmdTargetType
     {
         Command, //TODO does powershell supported?
-        ApplicationOrUrl,        
+        ApplicationOrUrl,
     }
 
     public class CmdEntry
@@ -1753,7 +1772,7 @@ namespace Slin.GoFaster
         public string CmdName { get; set; }
         [XmlAttribute]
         public string ShortCmdNames { get; set; }
-        public CmdTargetType TargetType { get; set; } 
+        public CmdTargetType TargetType { get; set; }
         [XmlAttribute]
         public string Owner { get; set; }
         public string Process { get; set; }
