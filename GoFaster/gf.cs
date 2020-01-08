@@ -30,7 +30,7 @@ namespace Slin.GoFaster
          * 2.0.5.0  update message/hit for Code command; support `ls --teams` and `ls --categories`
          * 2.0.7.0  support profile-custom.xml and support `lscmd`
          * 2.0.8.0  `swagger` or `swag`
-         * 2.0.9.0  hosts [find] [host]
+         * 2.0.9.2  hosts [find] [host]
          *          allow "-" in projNoOrName
          * */
         const string AppName = "GoFaster";
@@ -80,7 +80,7 @@ namespace Slin.GoFaster
 
         static Program()
         {
-            CmdRegularExpressionString = $@"^\s*(?<command>sync|open|bld|build|start|folder|fld|code|url|swagger|swag|teamcity|tc|wiki|cmd|desc|describe)\b(?:\s+(?<projNoOrName>[\^?\._\w]+(?:-[\._\w]+)*\$?))?"
+            CmdRegularExpressionString = $@"^\s*(?<command>sync|open|bld|build|start|folder|fld|code|url|swagger|swag|teamcity|tc|wiki|cmd|desc|describe)\b(?:\s+(?<projNoOrName>[\^\._a-zA-Z0-9]+(?:-[\._a-zA-Z0-9]+)*\$?))?"
             + $@"|^\s*(?<command>(?:lscmd|list|ls|set)\b)\s*"  //e.g. list /team:team8 /name:coreapi /category:ecash
             + $@"|^\s*(?<command>notepad|notepad\+\+|p4v|inetmgr|ssms|sql|iisreset|vs\d{4}|wcf|postman|pm)\b\s*"
             + @"|^\s*(?<command>help\b|\?)\s*$"
@@ -89,7 +89,7 @@ namespace Slin.GoFaster
             + @"|^\s*(?<command>vs\d{4}|vs|vscmd)\s*$"
             + @"|^\s*(?<command>donate)\b"
             + @"|^\s*(?<command>ping)\s+(?<action>.+)\s*$"  //action actually is IP or host name here
-            + $@"|^\s*(?<command>hosts)\b(?:\s+(?<action>open|set|find|restore|fld|folder|[^\s\t]+))?\s*"  //host, env, for:
+            + $@"|^\s*(?<command>hosts)\b(?:\s+(?<action>open|set|find|restore|fld|folder|[^\s\t?]+))?\s*"  //host, env, for:
             + @"|^\s*(?<command>db)\b(?:\s+(?<dbName>[-\w]+))?";  //set branch=int;
 
             _regAction = new Regex(CmdRegularExpressionString,
