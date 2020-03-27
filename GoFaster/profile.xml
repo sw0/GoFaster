@@ -1,0 +1,151 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Profile xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+  <CmdEntries>
+    <CmdEntry CmdName="gf" Owner="all" Enabled="true">
+      <Process>http://www.tainisoft.com/tools/GoFaster</Process>
+    </CmdEntry>
+    <CmdEntry CmdName="putty" Owner="all" Enabled="true">
+      <Process>C:\myapps\putty.exe</Process>
+    </CmdEntry>
+    <CmdEntry CmdName="linqpad" Owner="all" Enabled="true">
+      <Process>C:\myapps\LINQPad5\LINQPad.exe</Process>
+    </CmdEntry>
+  </CmdEntries>
+  <Teams>
+    <Team>Slin</Team>
+    <Team>Tony</Team>
+  </Teams>
+  <Projects>
+    <Project Enabled="true" SCM="git">
+      <Name>GoFaster</Name>
+      <Owners>
+        <Name>Slin</Name>
+      </Owners>
+      <Categories>
+        <Name>Slin</Name>
+      </Categories>
+      <Path>C:\Users\Shawn\source\github\GoFaster\GoFaster.sln</Path>
+      <Wiki>https://github.com/sw0/GoFaster/blob/master/README.md</Wiki>
+      <Endpoints>
+        <Endpoint Url="https://api.tainisoft.com/api/maskengine/swagger/" Type="Swagger" />
+      </Endpoints>
+    </Project>
+    <Project Enabled="true" SCM="git">
+      <Name>Slin.Common</Name>
+      <Owners>
+        <Name>Slin</Name>
+      </Owners>
+      <Categories>
+        <Name>Slin</Name>
+      </Categories>
+      <Path>C:\Users\Shawn\source\tainisoft\Slin.Common\Slin.Common.sln</Path>
+      <Wiki>https://dev.azure.com/tainisoft/Slin.Common/_wiki</Wiki>
+      <Endpoints>
+        <Endpoint Url="" Type="Swagger" />
+      </Endpoints>
+    </Project>
+    <Project Enabled="true" SCM="git">
+      <Name>Slin.Wechat</Name>
+      <Owners>
+        <Name>Slin</Name>
+      </Owners>
+      <Categories>
+        <Name>Slin</Name>
+      </Categories>
+      <Path>C:\Users\Shawn\source\tainisoft\Slin.Wechat\src\Slin.Wechat.sln</Path>
+      <Wiki>https://dev.azure.com/tainisoft/Slin.Wechat/_wiki</Wiki>
+      <Endpoints>
+        <Endpoint Url="" Type="Swagger" />
+      </Endpoints>
+    </Project>
+    <Project Enabled="true" SCM="git">
+      <Name>Slin.Logging</Name>
+      <Owners>
+        <Name>Slin</Name>
+      </Owners>
+      <Categories>
+        <Name>Package</Name>
+      </Categories>
+      <Path>C:\Users\Shawn\source\tainisoft\Slin.Logging\Slin.Logging.sln</Path>
+      <Wiki>https://dev.azure.com/tainisoft/Slin.Logging/_wiki</Wiki>
+      <Endpoints>
+        <Endpoint Url="" Type="Swagger" />
+      </Endpoints>
+    </Project>
+    <Project Enabled="true" SCM="git">
+      <Name>api.tainisoft.com</Name>
+      <Owners>
+        <Name>Slin</Name>
+      </Owners>
+      <Categories>
+        <Name>Package</Name>
+      </Categories>
+      <Path>C:\Users\Shawn\source\tainisoft\api.tainisoft.com\src\TainiSoft.ApiHost.sln</Path>
+      <Wiki>https://dev.azure.com/tainisoft/api.tainisoft.com/_wiki</Wiki>
+      <Endpoints>
+        <Endpoint Url="" Type="Swagger" />
+      </Endpoints>
+    </Project>
+    <Project Enabled="true" SCM="git">
+      <Name>Slin.ShoppingBot</Name>
+      <Owners>
+        <Name>Slin</Name>
+      </Owners>
+      <Categories>
+        <Name>Package</Name>
+      </Categories>
+      <Path>C:\Users\Shawn\source\tainisoft\Slin.ShoppingBot\src\Slin.ShoppingBot.sln</Path>
+      <Wiki></Wiki>
+      <Endpoints>
+        <Endpoint Url="" Type="" />
+      </Endpoints>
+    </Project>
+    <Project Enabled="true" SCM="git">
+      <Name>YD51</Name>
+      <Owners>
+        <Name>Slin</Name>
+      </Owners>
+      <Categories>
+        <Name>Package</Name>
+      </Categories>
+      <Path>C:\Users\Shawn\source\gitee\yd51\YD51.sln</Path>
+      <Wiki></Wiki>
+      <Endpoints>
+        <Endpoint Url="" Type="" />
+      </Endpoints>
+    </Project>
+    <Project Enabled="true">
+      <Name>RegexTool</Name>
+      <Owners>
+        <Name>Slin</Name>
+      </Owners>
+      <Categories>
+        <Name>Package</Name>
+      </Categories>
+      <Path>c:\p4\REPO2\current\RegexTool\RegexTool.sln</Path>
+      <Wiki>https://github.com/sw0/RegexTool</Wiki>
+    </Project>
+    <Project Enabled="true">
+      <Name>ConvesationChecker</Name>
+      <Owners>
+        <Name>Slin</Name>
+      </Owners>
+      <Categories>
+        <Name>Package</Name>
+      </Categories>
+      <Path>C:\Users\Shawn\source\tainisoft\ConversationChecker\src\ConvesationChecker.sln</Path>
+      <Wiki>https://dev.azure.com/tainisoft/ConversationChecker/_wiki/wikis</Wiki>
+    </Project>
+    <Project Enabled="true">
+      <Name>EasyAgent</Name>
+      <Owners>
+        <Name>Tony</Name>
+      </Owners>
+      <Categories>
+        <Name>Outsource</Name>
+      </Categories>
+      <Path>C:\Users\Shawn\source\wayneweiwei\EasyAgency\EasyAgency\EasyAgency.sln</Path>
+      <Wiki></Wiki>
+    </Project>
+  </Projects>
+</Profile>

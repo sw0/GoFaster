@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "GoFaster": {
+      "commandName": "Project",
+      "commandLineArgs": "-i"
+    }
+  }
+}
