@@ -11,8 +11,6 @@ namespace GoFaster.Commands
 {
     public class OpenCommand : BaseCommand
     {
-        public string Name { get; set; } = "Open";
-
         public OpenCommand(GoFasterContext context) : base(context)
         {
         }
@@ -23,7 +21,7 @@ namespace GoFaster.Commands
                 .ForEach(name =>
                 app.Command(name, c =>
                 {
-                    c.Description = "open given project";
+                    c.Description = "open given project by project index or project name(support regular expression)";
 
                     //var projectOpt = c.Option("--name -n <PROJECT_NAME>", "[Optional] project name", CommandOptionType.SingleValue);
                     var branchOpt = c.Option("--branch -b <BRANCH_NAME>", "[Optional] branch name", CommandOptionType.SingleValue);
@@ -42,32 +40,23 @@ namespace GoFaster.Commands
 
                         var filter = arg.Value;
 
-                        var query = Context.Profile.Projects.AsQueryable();
-
-                        query = query.Where(p => FilterPredict(p.Name, filter));
+                        var query = QueryProjects(filter, null, null);
 
                         var rows = query.ToList();
 
-                        if(rows.Count > 0)
+                        if (rows.Count > 0)
                         {
                             Console.WriteLine($"Got {rows.Count} projects: {string.Join(',', rows.Select(p => p.Name))}");
 
                             var project = rows.FirstOrDefault(p => !string.IsNullOrWhiteSpace(p.Path));
-                            
-                            if(project == null)
+
+                            if (project == null)
                             {
                                 Console.WriteLine($"No valid code path configured for projects found");
                                 return 0;
                             }
 
-                            var p = new Process
-                            {
-                                StartInfo = new ProcessStartInfo(project.Path)
-                                {
-                                    UseShellExecute = true
-                                }
-                            };
-                            p.Start();
+                            Open(project);
                         }
 
                         return 0;

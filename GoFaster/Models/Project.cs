@@ -1,18 +1,10 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Linq;
 using System.Text;
-using System.Threading.Tasks;
 using System.Xml.Serialization;
 
 namespace GoFaster.Models
 {
-    public class Profile
-    {
-        public List<CmdEntry> CmdEntries { get; set; }
-        public List<Project> Projects { get; set; }
-    }
-
     public class Project
     {
         private static char[] Splitter = new[] { ' ', ';', ',' };
@@ -61,12 +53,16 @@ namespace GoFaster.Models
 
         public List<Endpoint> Endpoints { get; set; }
 
+        [XmlArrayItem("Command")]
+        public List<string> EventCommands { get; set; }
+
         [XmlAttribute] public bool Enabled { get; set; } = true;
 
         public Project()
         {
             Owners = new List<string>();
             Categories = new List<string>();
+            EventCommands = new List<string>();
         }
 
         internal string GetTitle()
@@ -138,36 +134,5 @@ namespace GoFaster.Models
 
             return sb.ToString();
         }
-    }
-
-    public class Endpoint
-    {
-        [XmlAttribute]
-        public string Url { get; set; }
-        [XmlAttribute]
-        public string Type { get; set; } = "Default";
-    }
-
-
-    public enum CmdTargetType
-    {
-        Command, //TODO does powershell supported?
-        ApplicationOrUrl,
-    }
-
-    public class CmdEntry
-    {
-        [XmlAttribute]
-        public string CmdName { get; set; }
-        [XmlAttribute]
-        public string ShortCmdNames { get; set; }
-        public CmdTargetType TargetType { get; set; }
-        [XmlAttribute]
-        public string Owner { get; set; }
-        public string Process { get; set; }
-        public string CmdArgs { get; set; }
-
-        public string Description { get; set; }
-        [XmlAttribute] public bool Enabled { get; set; } = true;
     }
 }

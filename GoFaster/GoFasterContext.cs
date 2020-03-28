@@ -36,6 +36,8 @@ namespace GoFaster
 
         private static void NormalizeProfile(Profile profile)
         {
+            char[] LineSeparaters = new[] { '\r', '\n' };
+
             profile.Projects = profile.Projects ?? new List<Project>();
 
             var i = 1;
@@ -55,6 +57,8 @@ namespace GoFaster
 
                 p.Categories = p.Categories.Where(o => !string.IsNullOrEmpty(o))
                     .Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+
+                p.EventCommands ??= new List<string>();
             }
         }
 

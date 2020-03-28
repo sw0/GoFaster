@@ -1,5 +1,6 @@
 ﻿using GoFaster.Commands;
 using GoFaster.Models;
+using GoFaster.Utils;
 using Microsoft.Extensions.CommandLineUtils;
 using System;
 using System.Collections.Generic;

@@ -24,7 +24,7 @@ namespace GoFaster.Commands
                 c.Description = "list projects";
 
                 var optionName = c.Option("--name -n <PROJECT_NAME>", "[Optional] project name", CommandOptionType.SingleValue);
-                var optionTeams = c.Option("--team -t <TEAM_NAME>", "[Optional] team name", CommandOptionType.MultipleValue);
+                var optionOwners = c.Option("--team -t <TEAM_NAME>", "[Optional] team name", CommandOptionType.MultipleValue);
                 var optionCategory = c.Option("--category -c <CATETORY>", "[Optional] category", CommandOptionType.SingleValue);
 
                 c.HelpOption("-?|-h|--help");
@@ -33,39 +33,8 @@ namespace GoFaster.Commands
                 {
                     var projects = Context.Profile.Projects;
 
-                    IQueryable<Project> query = projects.AsQueryable();
-
-                    if (optionName.HasValue())
-                    {
-                        var filter = optionName.Value();
-                        query = query.Where(r => r.Name != null
-                        && FilterPredict(r.Name, filter));
-                    }
-
-                    if (optionName.HasValue())
-                    {
-                        var filter = optionName.Value();
-
-                        query = query.Where(r =>
-                            r.Name != null && FilterPredict(r.Name, filter)
-                        );
-                    }
-
-                    if (optionTeams.HasValue())
-                    {
-                        query = query.Where(r =>
-                            r.Name != null &&
-                            optionTeams.Values.Any(filter => FilterPredict<Project>(r, o => o.Owners, filter))
-                        );
-                    }
-
-                    if (optionCategory.HasValue())
-                    {
-                        query = query.Where(r =>
-                            r.Name != null &&
-                            FilterPredict(r, o => o.Categories, optionCategory.Value())
-                        );
-                    }
+                    IQueryable<Project> query = QueryProjects(optionName.Value(), optionOwners.Values,
+                        optionCategory.Values);
 
                     foreach (var p in query)
                     {

@@ -5,12 +5,13 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using System.Buffers;
 
 namespace GoFaster.Commands
 {
     public class DescribeCommand : BaseCommand
     {
-        public string Name { get; set; } = "Describe";
+        //public string Name { get; set; } = "Describe";
 
         public DescribeCommand(GoFasterContext context) : base(context)
         {
@@ -23,9 +24,6 @@ namespace GoFaster.Commands
                 app.Command(name, c =>
                 {
                     c.Description = "show description for given project";
-
-                    //var projectOpt = c.Option("--name -n <PROJECT_NAME>", "[Optional] project name", CommandOptionType.SingleValue);
-                    //var branchOpt = c.Option("--branch -b <BRANCH_NAME>", "[Optional] branch name", CommandOptionType.SingleValue);
 
                     var arg = c.Argument("<PROJECT_NAME>", "Project Name, can be partial or a regular expression");
 
@@ -43,11 +41,18 @@ namespace GoFaster.Commands
 
                         var query = Context.Profile.Projects.AsQueryable();
 
-                        query = query.Where(p => FilterPredict(p.Name, filter));
+                        if(int.TryParse(filter, out var index))
+                        {
+                            query = query.Where(p => p.Index == index);
+                        }
+                        else
+                        {
+                            query = query.Where(p => FilterPredict(p.Name, filter));
+                        }
 
                         foreach (var p in query.Take(5))
                         {
-                            Console.WriteLine(p.GetDetailedDescription());
+                            WriteLine(p.GetDetailedDescription());
                         }
                         return 0;
                     });

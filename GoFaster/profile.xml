@@ -15,11 +15,19 @@
     <Team>Slin</Team>
     <Team>Tony</Team>
   </Teams>
+  <GlobalEventCommand>
+    <Pre When="OS=WINNT32"><![CDATA[TODO
+    ]]></Pre>
+    <Post>
+      <![CDATA[TODO
+    ]]>
+    </Post>
+  </GlobalEventCommand>
   <Projects>
     <Project Enabled="true" SCM="git">
       <Name>GoFaster</Name>
       <Owners>
-        <Name>Slin</Name>
+        <Owner>Slin</Owner>
       </Owners>
       <Categories>
         <Name>Slin</Name>
@@ -29,6 +37,15 @@
       <Endpoints>
         <Endpoint Url="https://api.tainisoft.com/api/maskengine/swagger/" Type="Swagger" />
       </Endpoints>
+      <EventCommands>
+        <Command>
+        <![CDATA[
+        g2
+        g2
+        g2
+        ]]>
+        </Command>
+      </EventCommands>
     </Project>
     <Project Enabled="true" SCM="git">
       <Name>Slin.Common</Name>
