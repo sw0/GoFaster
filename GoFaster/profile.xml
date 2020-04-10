@@ -16,13 +16,25 @@
     <Team>Tony</Team>
   </Teams>
   <GlobalEventCommand>
-    <Pre When="OS=WINNT32"><![CDATA[TODO
-    ]]></Pre>
+    <Pre When="OS=WINNT32">
+      <![CDATA[TODO
+    ]]>
+    </Pre>
     <Post>
       <![CDATA[TODO
     ]]>
     </Post>
   </GlobalEventCommand>
+  <HostsSources>
+    <HostsSource Name="GBOS">
+      <HostsFile Environment="QA">C:\GBOS\hosts-qa.txt</HostsFile>
+      <HostsFile Environment="STAGE">C:\GBOS\hosts-stg.txt</HostsFile>
+    </HostsSource>
+    <HostsSource Name="SDLC">
+      <HostsFile Environment="QA">C:\SDLC\hosts-qa.txt</HostsFile>
+      <HostsFile Environment="STAGE">C:\SDLC\hosts-stg.txt</HostsFile>
+    </HostsSource>
+  </HostsSources>
   <Projects>
     <Project Enabled="true" SCM="git">
       <Name>GoFaster</Name>
@@ -39,7 +51,7 @@
       </Endpoints>
       <EventCommands>
         <Command>
-        <![CDATA[
+          <![CDATA[
         g2
         g2
         g2

@@ -10,8 +10,6 @@ namespace GoFaster.Commands
 {
     public class ClearCommand : BaseCommand
     {
-        public string Name { get; set; } = "list";
-
         public ClearCommand(GoFasterContext context) : base(context)
         {
         }

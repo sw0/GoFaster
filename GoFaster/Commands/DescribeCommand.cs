@@ -11,8 +11,6 @@ namespace GoFaster.Commands
 {
     public class DescribeCommand : BaseCommand
     {
-        //public string Name { get; set; } = "Describe";
-
         public DescribeCommand(GoFasterContext context) : base(context)
         {
         }

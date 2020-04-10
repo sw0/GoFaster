@@ -11,8 +11,6 @@ namespace GoFaster.Commands
 {
     public class ListCommand : BaseCommand
     {
-        public string Name { get; set; } = "list";
-
         public ListCommand(GoFasterContext context) : base(context)
         {
         }
