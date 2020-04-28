@@ -27,13 +27,19 @@ namespace GoFaster.Commands
                 {
                     var setCmd = c.Command("set", setConfig =>
                     {
-                        var envs = setConfig.Argument("<ENVIRONMENT>", "environments", true);
-                        setConfig.Description = "set hosts file";
+                        var optionEnvironment = setConfig.Option("--environment -e <ENVIRONMENT>", "[Optional] enviroment", CommandOptionType.SingleValue);
+
+                        c.HelpOption("-?|-h|--help");
+
+                        var envs = setConfig.Argument("<STACKS>", "stacks", true);
+                        setConfig.Description = "set hosts file base on given stack(s) and environment information";
 
                         setConfig.OnExecute(() =>
                         {
                             var tp = envs.Values;
-                            //TODO PERMISSION
+
+                            WriteLine("stacks: " + string.Join(",", envs.Values ?? new List<string> {"" }));
+                            WriteLine(optionEnvironment.Value());
 
                             return 0;
                         });
@@ -46,9 +52,15 @@ namespace GoFaster.Commands
 
                         setConfig.OnExecute(() =>
                         {
+                            if (!IsWinows)
+                            {
+                                WriteLine("Aborted. Only supported on Windows");
+                                return 0;
+                            }
+
                             var folder = Path.GetDirectoryName(HostsFile);
-                            //TODO PERMISSION
-                            Process.Start(folder);
+
+                            Process.Start("explorer.exe", folder);
 
                             return 0;
                         });
@@ -75,7 +87,6 @@ namespace GoFaster.Commands
 
         private void OpenHosts(string fileName)
         {
-
             Process.Start("notepad.exe", HostsFile);
         }
     }

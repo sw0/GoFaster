@@ -7,6 +7,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Linq.Expressions;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
@@ -23,6 +24,10 @@ namespace GoFaster.Commands
         }
 
         public abstract void Register(CommandLineApplication app);
+
+        protected bool IsWinows => RuntimeInformation.IsOSPlatform(OSPlatform.Windows);
+        protected bool IsLinux => RuntimeInformation.IsOSPlatform(OSPlatform.Linux);
+        protected bool IsOSX => RuntimeInformation.IsOSPlatform(OSPlatform.OSX);
 
         #region FilterPredict
 
